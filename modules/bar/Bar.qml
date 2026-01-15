@@ -107,7 +107,7 @@ Scope {
                         id: trayButton
                     }
                     UpdateIndicator{}
-                    UtilsWidget{}
+                    QuickSettingsWidget{}
                     ClockWidget {}
                 }
                 

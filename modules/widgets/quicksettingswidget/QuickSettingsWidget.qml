@@ -35,15 +35,15 @@ Button {
 
     onClicked: {
         if(menuOpen){
-            popupLoader.item.visible = false
+            popup.visible = false
         }
         else{
-            popupLoader.item.visible = true
+            popup.visible = true
         }
         menuOpen = !menuOpen
     }
 
-    UtilsPopup{
-        id: popupLoader
+    QuickSettingsPopup{
+        id: popup
     }
 }
