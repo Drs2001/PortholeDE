@@ -1,6 +1,7 @@
 import qs.singletons
 import QtQuick
 import QtQuick.Controls
+import qs.modules.widgets.quicksettingswidget
 import Quickshell
 
 Button{
@@ -32,13 +33,30 @@ Button{
     status.visible = updateButton.hovered
   }
 
-  IndicatorsPopup{
+  PopupWindow {
     id: status
+    property var margin: 15
     anchor {
         item: updateButton
         rect.x: (updateButton.width - width) / 2
         rect.y: -height - 10
     }
-    messageText: "Base packages: " + UpdateListener.base_packages + "\n AUR packages: " + UpdateListener.aur_packages
+    implicitWidth: message.width + margin
+    implicitHeight: message.height + margin
+    color: "transparent"
+    Rectangle {
+        anchors.fill: parent
+        color: Themes.popupBackgroundColor
+        radius: 10
+
+        Text {
+            id: message
+            anchors.centerIn: parent 
+            anchors.margins: 30
+            text: "Base packages: " + UpdateListener.base_packages + "\n AUR packages: " + UpdateListener.aur_packages
+            color: Themes.textColor
+            font.pixelSize: 12
+        }
+    }
   }
 }

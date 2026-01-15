@@ -4,6 +4,7 @@ import QtQuick.Controls
 import Quickshell
 import Quickshell.Widgets
 import Quickshell.Services.Pipewire
+import qs.modules.widgets.quicksettingswidget
 import qs.singletons
 
 Button {

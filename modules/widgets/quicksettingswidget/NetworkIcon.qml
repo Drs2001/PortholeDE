@@ -37,14 +37,31 @@ Item{
         }
     }
 
-    IndicatorsPopup{
+    PopupWindow {
         id: status
+        property var margin: 15
         anchor {
             item: networkIcon
             rect.x: (networkIcon.width - width) / 2
             rect.y: -height - 20
         }
-        messageText: networkName
+        implicitWidth: message.width + margin
+        implicitHeight: message.height + margin
+        color: "transparent"
+        Rectangle {
+            anchors.fill: parent
+            color: Themes.popupBackgroundColor
+            radius: 10
+
+            Text {
+                id: message
+                anchors.centerIn: parent 
+                anchors.margins: 30
+                text: networkName
+                color: Themes.textColor
+                font.pixelSize: 12
+            }
+        }
     }
 
     Process {

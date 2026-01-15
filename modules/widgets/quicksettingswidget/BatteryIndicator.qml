@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Quickshell
 import qs.singletons
 
 RowLayout {
@@ -25,13 +26,30 @@ RowLayout {
     }
   }
 
-  IndicatorsPopup{
+  PopupWindow {
     id: status
-     anchor {
+    property var margin: 15
+    anchor {
         item: battery
         rect.x: (battery.width - width) / 2
         rect.y: -height - 20
     }
-    messageText: "Battery status: " +  PowerManager.batteryPercentage + "% remaining"
+    implicitWidth: message.width + margin
+    implicitHeight: message.height + margin
+    color: "transparent"
+    Rectangle {
+        anchors.fill: parent
+        color: Themes.popupBackgroundColor
+        radius: 10
+
+        Text {
+            id: message
+            anchors.centerIn: parent 
+            anchors.margins: 30
+            text: "Battery status: " +  PowerManager.batteryPercentage + "% remaining"
+            color: Themes.textColor
+            font.pixelSize: 12
+        }
+    }
   }
 }
