@@ -17,7 +17,7 @@ Singleton {
     property color textColor: activePalette.text
     property color accentColor: activePalette.accent
     property color accentHover: Qt.lighter(activePalette.accent, 1.8)
-    property color accentTextColor: themes[currentTheme].accentTextColor
+    property color accentTextColor: '#000000'
 
     property color popupBackgroundColor: activePalette.base
 

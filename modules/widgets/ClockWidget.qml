@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import Quickshell
 import qs.modules.widgets.clockwidget
 import qs.singletons
 
@@ -14,8 +15,16 @@ Button{
     color: clockButton.hovered ? Themes.primaryHoverColor : "transparent"
     radius: 5
   }
+
+  // Add SystemClock component
+  SystemClock {
+    id: clock
+    enabled: true
+    precision: SystemClock.Minutes // Updates every minute
+  }
+
   contentItem: Text {
-      text: Time.time + Time.date
+      text: Qt.formatDateTime(clock.date, "h:mm AP\nM/dd/yyyy")
       color: Themes.textColor
       font.family: Themes.textFont
       font.pixelSize: 14

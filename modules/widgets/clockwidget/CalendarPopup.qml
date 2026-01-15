@@ -44,7 +44,7 @@ LazyLoader {
                         anchors.verticalCenter: parent.verticalCenter
                         anchors.left: parent.left
                         anchors.leftMargin: 10
-                        text: Time.todaysDate
+                        text: Qt.formatDateTime(clock.date, "dddd, MMMM d")
                         font.pixelSize: 14
                         color: Themes.textColor
                     }
