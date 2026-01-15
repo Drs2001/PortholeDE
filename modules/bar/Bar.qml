@@ -8,8 +8,6 @@ import Quickshell.Hyprland
 import Quickshell.Wayland
 import Quickshell.Services.Notifications
 import qs.modules.widgets
-import qs.modules.widgets.startwidget
-import qs.modules.widgets.openwindowswidget
 import qs.modules.systemtray
 import qs.modules.notifications
 import qs.singletons
@@ -77,7 +75,7 @@ Scope {
                 anchors.topMargin: 0
                 anchors.bottomMargin: 0
                 
-                StartButton {
+                StartWidget {
                     implicitWidth: parent.height - (mainRow.topBottomMargins * 2)
                     implicitHeight: parent.height - (mainRow.topBottomMargins * 2)
                     Layout.topMargin: mainRow.topBottomMargins
@@ -85,7 +83,7 @@ Scope {
                     Layout.leftMargin: 5
                 }
 
-                OpenWindowsScroller{
+                OpenWindowsWidget{
                     Layout.fillWidth: true
                     Layout.maximumWidth: root.width - rightWidgets.width
                     height: parent.height - (mainRow.topBottomMargins * 2)

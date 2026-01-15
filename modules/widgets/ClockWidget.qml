@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import qs.modules.widgets.clockwidget
 import qs.singletons
 
 Button{
