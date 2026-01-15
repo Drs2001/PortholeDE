@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Io
 import qs.modules.widgets.quicksettingswidget.bluetooth
 import qs.modules.widgets.quicksettingswidget.audiocontrols
 import qs.modules.widgets.quicksettingswidget.powerprofiles
@@ -10,6 +11,7 @@ import qs.singletons
 
 Item {
     id: rootMenu
+    property var brightness: 1
     implicitHeight: 300
     ColumnLayout {
         anchors.fill: parent
@@ -159,7 +161,7 @@ Item {
                 Slider {
                     id: brightControl
                     from: .1
-                    value: BrightnessManager.brightness
+                    value: rootMenu.brightness
                     to: 1
                     stepSize: 0.01
 
@@ -257,6 +259,28 @@ Item {
             }
         }
 
+    }
+
+    // Brightness pulling to control brightness slider position
+    Process {
+        id: gammaProc
+        command: ["hyprctl", "hyprsunset", "gamma"]
+        running: true
+
+        stdout: StdioCollector {
+        onStreamFinished: {
+            rootMenu.brightness = parseInt(this.text.trim()) * .01
+        }
+        }
+    }
+
+    Timer {
+        interval: 1000
+        running: true
+        repeat: true
+        onTriggered: {
+        gammaProc.running = true
+        }
     }
     
 }
