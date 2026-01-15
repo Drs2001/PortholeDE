@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import Quickshell
+import qs.modules.widgets.systemtraywidget
 import qs.singletons
 
 Button {

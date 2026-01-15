@@ -4,11 +4,8 @@ import QtQuick.Layouts
 import QtQuick.Controls
 import Quickshell
 import Quickshell.Widgets
-import Quickshell.Hyprland
-import Quickshell.Wayland
 import Quickshell.Services.Notifications
 import qs.modules.widgets
-import qs.modules.systemtray
 import qs.modules.notifications
 import qs.singletons
 
@@ -38,7 +35,6 @@ Scope {
             required property var modelData
             screen: modelData
             
-            WlrLayershell.namespace: "qsBar"
             color: Themes.primaryColor
             
             anchors {
@@ -100,7 +96,7 @@ Scope {
                     Layout.topMargin: mainRow.topBottomMargins
                     Layout.bottomMargin: mainRow.topBottomMargins
 
-                    SystemTrayButton{
+                    SystemTrayWidget{
                         id: trayButton
                     }
                     UpdateWidget{}
