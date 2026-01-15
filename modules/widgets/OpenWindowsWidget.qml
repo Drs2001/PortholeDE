@@ -7,11 +7,11 @@ ListView {
     id: windowScroller
     orientation: ListView.Horizontal
 
-    model: WindowManager.windowKeys
+    model: ApplicationsManager.windowKeys
     boundsBehavior: Flickable.StopAtBounds
     delegate: WindowButton {
         required property string modelData
-        property var windowInfo: WindowManager.openWindows[modelData]
+        property var windowInfo: ApplicationsManager.openWindows[modelData]
     }
 
     WindowPopupView {
