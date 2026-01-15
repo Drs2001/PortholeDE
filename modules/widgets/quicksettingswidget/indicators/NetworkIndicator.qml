@@ -4,27 +4,27 @@ import Quickshell.Io
 import qs.singletons
 
 Item{
-    id: networkIcon
-    implicitHeight: networkIconText.height
-    implicitWidth: networkIconText.width
+    id: networkIndicator
+    implicitHeight: networkIndicatorText.height
+    implicitWidth: networkIndicatorText.width
 
     property string networkStatus: "disconnected"
     property string networkName: ""
 
-    function updateNetworkIcon() {
+    function updatenetworkIndicator() {
         // Update icon based on network status
         if(networkStatus.includes("ethernet")){
-            networkIconText.text = "\udb80\udc02";  // ethernet icon
+            networkIndicatorText.text = "\udb80\udc02";  // ethernet icon
         }
         else if (networkStatus.includes("wireless")) {
-            networkIconText.text = "\udb81\udda9";  // wifi icon
+            networkIndicatorText.text = "\udb81\udda9";  // wifi icon
         } 
         else {
-            networkIconText.text = "\udb81\uddaa";  // disconnected icon
+            networkIndicatorText.text = "\udb81\uddaa";  // disconnected icon
         }
     }
     Text{
-        id: networkIconText
+        id: networkIndicatorText
         font.family: "Symbols Nerd Font"
         font.pixelSize: 16
         color: Themes.textColor
@@ -41,8 +41,8 @@ Item{
         id: status
         property var margin: 15
         anchor {
-            item: networkIcon
-            rect.x: (networkIcon.width - width) / 2
+            item: networkIndicator
+            rect.x: (networkIndicator.width - width) / 2
             rect.y: -height - 20
         }
         implicitWidth: message.width + margin
@@ -70,8 +70,8 @@ Item{
         running: true
         stdout: StdioCollector {
             onStreamFinished: {
-                networkIcon.networkStatus = this.text
-                updateNetworkIcon()
+                networkIndicator.networkStatus = this.text
+                updatenetworkIndicator()
             }
         }
     }
@@ -97,5 +97,5 @@ Item{
         }
     }
 
-    Component.onCompleted: updateNetworkIcon()
+    Component.onCompleted: updatenetworkIndicator()
 }

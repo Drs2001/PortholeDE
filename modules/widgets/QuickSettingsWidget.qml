@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Widgets
 import Quickshell.Services.Pipewire
 import qs.modules.widgets.quicksettingswidget
+import qs.modules.widgets.quicksettingswidget.indicators
 import qs.singletons
 
 Button {
@@ -15,12 +16,12 @@ Button {
 
     contentItem: RowLayout{
         spacing: 8
-        NetworkIcon{
-            id: networkIcon
+        NetworkIndicator{
+            id: networkIndicator
             Layout.alignment: Qt.AlignHCenter
         }
-        VolumeIcon {
-            id: volumeIcon
+        VolumeIndicator {
+            id: volumeIndicator
             Layout.alignment: Qt.AlignHCenter
         }
         BatteryIndicator{
