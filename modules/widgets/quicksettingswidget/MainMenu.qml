@@ -2,10 +2,10 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
-import qs.modules.widgets.utilswidget.bluetooth
-import qs.modules.widgets.utilswidget.audiocontrols
-import qs.modules.widgets.utilswidget.powerprofiles
-import qs.modules.widgets.utilswidget.nightlight
+import qs.modules.widgets.quicksettingswidget.bluetooth
+import qs.modules.widgets.quicksettingswidget.audiocontrols
+import qs.modules.widgets.quicksettingswidget.powerprofiles
+import qs.modules.widgets.quicksettingswidget.nightlight
 import qs.singletons
 
 Item {

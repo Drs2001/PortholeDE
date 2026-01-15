@@ -9,7 +9,7 @@ import Quickshell.Wayland
 import Quickshell.Services.Notifications
 import qs.modules.widgets
 import qs.modules.widgets.startwidget
-import qs.modules.widgets.utilswidget
+import qs.modules.widgets.quicksettingswidget
 import qs.modules.widgets.openwindowswidget
 import qs.modules.systemtray
 import qs.modules.notifications
