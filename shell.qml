@@ -1,6 +1,18 @@
 import Quickshell
+import Quickshell.Hyprland
 import "modules/bar"
+import "modules/applauncher"
 
-Scope {
+ShellRoot{
+  GlobalShortcut {
+      name: "toggle-appmenu"
+
+      onPressed: {
+          appMenu.visible = !appMenu.visible
+      }
+  }
   Bar {}
+  AppLauncher{
+    id: appMenu
+  }
 }

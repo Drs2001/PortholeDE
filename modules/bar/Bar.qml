@@ -27,6 +27,7 @@ Scope {
             notification.tracked = true
         }
     }
+
     Variants {
         model: Quickshell.screens
         
