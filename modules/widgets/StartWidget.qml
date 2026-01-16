@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import Quickshell
 import Quickshell.Io
+import qs.modules.widgets.startwidget
 import qs.singletons
 
 Button {

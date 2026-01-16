@@ -4,14 +4,8 @@ import QtQuick.Layouts
 import QtQuick.Controls
 import Quickshell
 import Quickshell.Widgets
-import Quickshell.Hyprland
-import Quickshell.Wayland
 import Quickshell.Services.Notifications
 import qs.modules.widgets
-import qs.modules.widgets.startwidget
-import qs.modules.widgets.utilswidget
-import qs.modules.widgets.openwindowswidget
-import qs.modules.systemtray
 import qs.modules.notifications
 import qs.singletons
 
@@ -41,7 +35,6 @@ Scope {
             required property var modelData
             screen: modelData
             
-            WlrLayershell.namespace: "qsBar"
             color: Themes.primaryColor
             
             anchors {
@@ -78,7 +71,7 @@ Scope {
                 anchors.topMargin: 0
                 anchors.bottomMargin: 0
                 
-                StartButton {
+                StartWidget {
                     implicitWidth: parent.height - (mainRow.topBottomMargins * 2)
                     implicitHeight: parent.height - (mainRow.topBottomMargins * 2)
                     Layout.topMargin: mainRow.topBottomMargins
@@ -86,7 +79,7 @@ Scope {
                     Layout.leftMargin: 5
                 }
 
-                OpenWindowsScroller{
+                OpenWindowsWidget{
                     Layout.fillWidth: true
                     Layout.maximumWidth: root.width - rightWidgets.width
                     height: parent.height - (mainRow.topBottomMargins * 2)
@@ -103,11 +96,11 @@ Scope {
                     Layout.topMargin: mainRow.topBottomMargins
                     Layout.bottomMargin: mainRow.topBottomMargins
 
-                    SystemTrayButton{
+                    SystemTrayWidget{
                         id: trayButton
                     }
-                    UpdateIndicator{}
-                    UtilsWidget{}
+                    UpdateWidget{}
+                    QuickSettingsWidget{}
                     ClockWidget {}
                 }
                 

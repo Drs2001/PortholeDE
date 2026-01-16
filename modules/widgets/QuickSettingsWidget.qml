@@ -4,6 +4,8 @@ import QtQuick.Controls
 import Quickshell
 import Quickshell.Widgets
 import Quickshell.Services.Pipewire
+import qs.modules.widgets.quicksettingswidget
+import qs.modules.widgets.quicksettingswidget.indicators
 import qs.singletons
 
 Button {
@@ -14,12 +16,12 @@ Button {
 
     contentItem: RowLayout{
         spacing: 8
-        NetworkIcon{
-            id: networkIcon
+        NetworkIndicator{
+            id: networkIndicator
             Layout.alignment: Qt.AlignHCenter
         }
-        VolumeIcon {
-            id: volumeIcon
+        VolumeIndicator {
+            id: volumeIndicator
             Layout.alignment: Qt.AlignHCenter
         }
         BatteryIndicator{
@@ -35,15 +37,15 @@ Button {
 
     onClicked: {
         if(menuOpen){
-            popupLoader.item.visible = false
+            popup.visible = false
         }
         else{
-            popupLoader.item.visible = true
+            popup.visible = true
         }
         menuOpen = !menuOpen
     }
 
-    UtilsPopup{
-        id: popupLoader
+    QuickSettingsPopup{
+        id: popup
     }
 }
