@@ -6,7 +6,6 @@ import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.singletons
-import qs.modules.widgets.startwidget
 
 PanelWindow {
     id: appLauncher
@@ -97,9 +96,44 @@ PanelWindow {
                                 font.pixelSize: 16
                                 Layout.fillWidth: true
                             }
-                            ApplicationButton{
-                                application: modelData
+                            Button {
+                                id: button
                                 Layout.fillWidth: true
+
+                                contentItem: Row{
+                                    spacing: 8
+
+                                    // Temporary solution for displaying icons, doesnt fully work and some icons look pixelated
+                                    Image {
+                                        source: Quickshell.iconPath(modelData.icon, true)
+                                        height: 24
+                                        width: 24
+                                        fillMode: Image.PreserveAspectFit
+                                    }
+                                    Text{
+                                        text: modelData.name
+                                        color: Themes.textColor
+                                    }
+                                }
+
+                                background: Rectangle{
+                                    color: button.hovered ? Themes.primaryHoverColor : "transparent"
+                                    border.color: button.hovered ? Themes.primaryHoverShadow : "transparent"
+                                    radius: 6
+                                }
+
+                                onClicked: {
+                                    if(modelData.runInTerminal){
+                                        Quickshell.execDetached({
+                                            command: ["kitty", ...modelData.command],
+                                            workingDirectory: modelData.workingDirectory,
+                                        });
+                                    }
+                                    else{
+                                        modelData.execute()
+                                    }
+                                    appLauncher.visible = false
+                                }
                             }
                         }
                     }
