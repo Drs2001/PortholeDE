@@ -45,6 +45,19 @@ PanelWindow {
         radius: 12
         color: Themes.primaryColor 
 
+        Keys.onPressed: (event) => {
+            if (event.key === Qt.Key_Down) {
+                listView.incrementCurrentIndex()
+                event.accepted = true
+            } else if (event.key === Qt.Key_Up) {
+                listView.decrementCurrentIndex()
+                event.accepted = true
+            } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                listView.currentItem?.run()
+                event.accepted = true
+            }
+        }
+
         ColumnLayout {
             anchors.fill: parent
 
@@ -77,66 +90,69 @@ PanelWindow {
 
                 contentWidth: availableWidth
 
-                ColumnLayout {
-                    width: parent.width
+                ListView {
+                    id: listView
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
+                    clip: true
+                    keyNavigationEnabled: false
+                    currentIndex: 0
+                    highlightFollowsCurrentItem: true
+                    highlightMoveDuration: 0
+                    highlight: Rectangle {
+                        color: Themes.primaryHoverColor
+                        radius: 6
+                    }
+                    model: ApplicationsManager.entries
 
-                    Repeater {
-                        model: ApplicationsManager.entries
-                        delegate: ColumnLayout {
-                            required property var modelData
-                            required property int index
-                            spacing: 5
-                            Layout.fillWidth: true
-                            Text {
-                                visible: index === 0 || 
-                                        modelData.name.charAt(0).toUpperCase() !== 
-                                        ApplicationsManager.entries[index - 1].name.charAt(0).toUpperCase()
-                                text: modelData.name.charAt(0).toUpperCase()
-                                color: Themes.textColor
-                                font.pixelSize: 16
-                                Layout.fillWidth: true
+                    delegate: Button {
+                        required property var modelData
+                        required property int index
+                        width: listView.width
+
+                        contentItem: Row{
+                            spacing: 8
+
+                            Image {
+                                source: Quickshell.iconPath(modelData.icon, true)
+                                height: 24
+                                width: 24
+                                fillMode: Image.PreserveAspectFit
                             }
-                            Button {
-                                id: button
-                                Layout.fillWidth: true
-
-                                contentItem: Row{
-                                    spacing: 8
-
-                                    // Temporary solution for displaying icons, doesnt fully work and some icons look pixelated
-                                    Image {
-                                        source: Quickshell.iconPath(modelData.icon, true)
-                                        height: 24
-                                        width: 24
-                                        fillMode: Image.PreserveAspectFit
-                                    }
-                                    Text{
-                                        text: modelData.name
-                                        color: Themes.textColor
-                                    }
-                                }
-
-                                background: Rectangle{
-                                    color: button.hovered ? Themes.primaryHoverColor : "transparent"
-                                    border.color: button.hovered ? Themes.primaryHoverShadow : "transparent"
-                                    radius: 6
-                                }
-
-                                onClicked: {
-                                    if(modelData.runInTerminal){
-                                        Quickshell.execDetached({
-                                            command: ["kitty", ...modelData.command],
-                                            workingDirectory: modelData.workingDirectory,
-                                        });
-                                    }
-                                    else{
-                                        modelData.execute()
-                                    }
-                                    appLauncher.visible = false
-                                }
+                            Text{
+                                text: modelData.name
+                                color: Themes.textColor
                             }
                         }
+
+                        background: Rectangle {
+                            color: "transparent"
+                            radius: 6
+                        }
+
+                        onClicked: {
+                            if(listView.currentIndex === index) {
+                                run()
+                            }
+                            else {
+                                listView.currentIndex = index
+                            }
+                        }
+
+                        function run() {
+                            if (modelData.runInTerminal) {
+                                Quickshell.execDetached({
+                                    command: ["kitty", ...modelData.command],
+                                    workingDirectory: modelData.workingDirectory
+                                })
+                            } 
+                            else {
+                                modelData.execute()
+                            }
+                            appLauncher.visible = false
+                        }
                     }
+                    
                 }
             }
         }
