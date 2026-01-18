@@ -7,6 +7,7 @@ import qs.modules.widgets.quicksettingswidget.bluetooth
 import qs.modules.widgets.quicksettingswidget.audiocontrols
 import qs.modules.widgets.quicksettingswidget.powerprofiles
 import qs.modules.widgets.quicksettingswidget.nightlight
+import qs.modules.widgets.quicksettingswidget.network
 import qs.singletons
 
 Item {
@@ -24,6 +25,11 @@ Item {
             Layout.leftMargin: 15
             Layout.topMargin: 20
             spacing: 20
+
+            NetworkMenuButton {
+                stack: rootStack
+                buttonWidth: rootMenu.buttonWidth
+            }
             
             // Bluetooth Button
             BTMenuButton{
