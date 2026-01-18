@@ -6,11 +6,12 @@ import Quickshell.Services.UPower
 import qs.singletons
 
 ColumnLayout{
-    width: 90
+    required property var buttonWidth
+    width: buttonWidth
 
     Button {
         id: powerProfilesOpen
-        implicitHeight: 45
+        implicitHeight: buttonWidth / 2
         Layout.fillWidth: true
 
         Layout.alignment: Qt.AlignHCenter

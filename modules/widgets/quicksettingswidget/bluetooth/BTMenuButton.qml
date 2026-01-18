@@ -7,13 +7,14 @@ import qs.singletons
 
 ColumnLayout{
     required property var stack
+    required property var buttonWidth
 
     Row {
         Layout.alignment: Qt.AlignHCenter
         Button {
             id: bluetoothToggle
-            implicitHeight: 45
-            implicitWidth: 45
+            implicitHeight: buttonWidth / 2
+            implicitWidth: buttonWidth / 2
 
             contentItem: Text{
                 font.pixelSize: 18
@@ -48,8 +49,8 @@ ColumnLayout{
         }
         Button {
             id: bluetoothOpen
-            implicitHeight: 45
-            implicitWidth: 45
+            implicitHeight: buttonWidth / 2
+            implicitWidth: buttonWidth / 2
 
             contentItem: Text{
                 font.pixelSize: 15

@@ -12,6 +12,7 @@ import qs.singletons
 Item {
     id: rootMenu
     property var brightness: 1
+    property var buttonWidth: 90
     implicitHeight: 300
     ColumnLayout {
         anchors.fill: parent
@@ -27,13 +28,18 @@ Item {
             // Bluetooth Button
             BTMenuButton{
                 stack: rootStack
+                buttonWidth: rootMenu.buttonWidth
             }
 
             // Power profiles switch
-            PPMenuButton{}
+            PPMenuButton{
+                buttonWidth: rootMenu.buttonWidth
+            }
 
             // Night light toggle
-            NightLightButton{}
+            NightLightButton{
+                buttonWidth: rootMenu.buttonWidth
+            }
         }
 
         // Audio Control

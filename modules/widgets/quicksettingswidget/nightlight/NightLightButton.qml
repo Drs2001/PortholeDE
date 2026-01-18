@@ -7,12 +7,13 @@ import Quickshell.Hyprland
 import qs.singletons
 
 ColumnLayout{
+    required property var buttonWidth
     property var isNightLightEnabled: false
-    width: 90
+    width: buttonWidth
 
     Button {
         id: nightLightToggle
-        implicitHeight: 45
+        implicitHeight: buttonWidth / 2
         Layout.fillWidth: true
 
         Layout.alignment: Qt.AlignHCenter
