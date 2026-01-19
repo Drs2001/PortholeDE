@@ -11,6 +11,7 @@ ShellRoot{
           appMenu.visible = !appMenu.visible
       }
   }
+  DesktopGrid{}
   Bar {}
   AppLauncher{
     id: appMenu
