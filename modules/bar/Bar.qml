@@ -10,6 +10,7 @@ import qs.modules.notifications
 import qs.singletons
 
 Scope {
+    property int barHeight: 50
     NotificationServer{
         id: notificationServer
         
@@ -44,7 +45,7 @@ Scope {
                 right: true
             }
             
-            implicitHeight: 50
+            implicitHeight: barHeight
             
             margins {
                 top: 0

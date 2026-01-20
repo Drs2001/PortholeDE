@@ -11,8 +11,12 @@ ShellRoot{
           appMenu.visible = !appMenu.visible
       }
   }
-  DesktopGrid{}
-  Bar {}
+  DesktopGrid{
+    barHeight: taskbar.barHeight
+  }
+  Bar {
+    id: taskbar
+  }
   AppLauncher{
     id: appMenu
   }
