@@ -24,6 +24,27 @@ Variants {
             anchors.fill: parent
             color: "transparent"
 
+            DropArea {
+                anchors.fill: parent
+
+                onEntered: function(drag) {
+                    if(drag.hasUrls) {
+                        drag.accept()
+                    }
+                }
+
+                onDropped: function(drop) {
+                    var desktopPath = Quickshell.env("HOME") + "/Desktop"
+
+                    if(drop.hasUrls){
+                        var filePath = drop.urls[0].toString().replace("file://", "")
+                        Quickshell.execDetached({
+                            command: ["mv", filePath, desktopPath]
+                        });
+                    }
+                }
+            }
+
             MouseArea {
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                 anchors.fill: parent
@@ -37,53 +58,32 @@ Variants {
                 }
             }
 
-            // Repeater {
-            //     id: grid
-                
-            //     model: ListModel {
-            //         ListElement {
-            //             name: "Bob"
-            //             xPos: 10
-            //             yPos: 10
-            //         }
-            //         ListElement {
-            //             name: "TEST"
-            //             xPos: 68
-            //             yPos: 10
-            //         }
-            //     }
-
-            //     delegate: Item {
-            //         id: testItem
-            //         required property string name
-            //         required property string xPos
-            //         required property string yPos
-            //         x: xPos
-            //         y: yPos
-            //         Button {
-            //             id: testButton
-            //             implicitHeight: 48
-            //             implicitWidth: 48
-            //             text: name
-            //         }
-
-            //         MouseArea {
-            //             drag.target: testButton
-            //         }
-            //     }
-            // }
-
             Rectangle {
                 id: rect
-                width: 50; height: 50
+                width: 50
+                height: 50
                 color: "red"
 
-                MouseArea {
-                    anchors.fill: parent
-                    drag.target: rect
-                    // drag.axis: Drag.XAxis
-                    // drag.minimumX: 0
-                    // drag.maximumX: container.width - rect.width
+                Drag.mimeData: {
+                    "text/plain": "TEST"
+                }
+                Drag.dragType: Drag.Automatic
+                Drag.supportedActions: Qt.CopyAction
+
+                DragHandler {
+                    id: dragger
+                    target: null
+
+                    onActiveChanged: {
+                        if (active) {
+                             parent.grabToImage(function(result) {
+                                parent.Drag.imageSource = result.url
+                                parent.Drag.active = true
+                            })
+                        } else {
+                            parent.Drag.active = false
+                        }
+                    }
                 }
             }
         }
