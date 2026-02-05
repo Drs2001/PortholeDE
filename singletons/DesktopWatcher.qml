@@ -7,48 +7,78 @@ Singleton {
     id: root
     
     property string watchPath: Quickshell.env("HOME") + "/Desktop"
-    property var debounceTimers: ({})
+    property var renameBuffer: ({})
     
     property var process: Process {
         running: true
-        command: ["inotifywait", "-m", "-e", "create,delete,modify,moved_to,moved_from", 
-                  watchPath]
+        // Needed the output of inotifywait to be piped into the stat command to get the files inode value
+        command: ["sh", "-c", 
+                    `inotifywait -m -e create,delete,close_write,moved_to,moved_from --format "%w|%e|%f|%c" "${watchPath}" | 
+                    while IFS="|" read -r path event file cookie; do
+                        # Try to get the inode. If file is deleted, stat fails, so we return 0.
+                        inode=$(stat -c %i "$path$file" 2>/dev/null || echo "0")
+                        echo "$path|$event|$file|$cookie|$inode"
+                    done`
+        ]
         
         stdout: SplitParser {
             onRead: function(data) {
-                var parts = data.trim().split(/[\s,]+/)
+                var parts = data.trim().split("|")
                 var path = parts[0]
                 var event = parts[1]
-                var isDir = false
-                var filename = ""
-                
-                if(data.includes("ISDIR")) {
-                    isDir = true
-                    filename = parts[3]
-                }
-                else {
-                    filename = parts[2] 
-                }
+                var filename = parts[2]
+                var renameCookie = parts[3] //inotify emits a cookie to match the moved_from and moved_to events for a rename
+                var inode = parts[4]
+
                 var fullPath = path + filename
 
-                if (event === "MODIFY") {
-                    root.fileModified(fullPath)
-                } else if (event === "CREATE") {
-                    root.fileCreated(fullPath)
-                } else if (event === "DELETE") {
-                    root.fileDeleted(fullPath)
+                if (event.includes("CREATE")) {
+                    root.fileAdded(fullPath, inode)
+                } else if (event.includes("DELETE")) {
+                    root.fileRemoved(fullPath, inode)
                 } else if (event.includes("MOVED_FROM")) {
-                    root.fileMovedFrom(fullPath)
+                    renameBuffer[renameCookie] = {
+                        from: fullPath,
+                        to: null,
+                        inode: inode
+                    }
+                    renameTimer.restart()
                 } else if (event.includes("MOVED_TO")) {
-                    root.fileMovedTo(fullPath)
+                    if(!renameBuffer[renameCookie]){
+                        renameBuffer[renameCookie] = {}
+                    }
+                    renameBuffer[renameCookie].to = fullPath
+                    renameBuffer[renameCookie].inode = inode
+                    renameTimer.restart()
                 }
             }
         }
     }
+
+    // Buffer timer is used to identify renames of files and folders and send the appropriate signal
+    Timer {
+        id: renameTimer
+        interval: 150
+        repeat: false
+        onTriggered: {
+            for (var cookie in renameBuffer) {
+                var r = renameBuffer[cookie]
+
+                if (r.from && r.to) {
+                    root.fileRenamed(r.to, r.inode)
+                } else if (r.from) {
+                    root.fileRemoved(r.from, r.inode)
+                } else if (r.to) {
+                    root.fileAdded(r.to, r.inode)
+                }
+            }
+
+            renameBuffer = ({})
+        }
+    }
     
-    signal fileCreated(string path)
-    signal fileDeleted(string path)
-    signal fileModified(string path)
-    signal fileMovedFrom(string path)
-    signal fileMovedTo(string path)
+    // We use only 3 signals for simplicity as a move_from event and deleted event are essentially the same thing for this purpose
+    signal fileAdded(string path, string inode)
+    signal fileRemoved(string path, string inode)
+    signal fileRenamed(string path, string inode)
 }
