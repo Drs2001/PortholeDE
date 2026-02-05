@@ -36,6 +36,8 @@ Variants {
                 onDropped: function(drop) {
                     var desktopPath = Quickshell.env("HOME") + "/Desktop"
 
+                    DesktopStateManager.updateDesktopIconXY(drop.getDataAsString("application/x-desktop-icon"), drop.x, drop.y)
+
                     if(drop.hasUrls){
                         var filePath = drop.urls[0].toString().replace("file://", "")
                         Quickshell.execDetached({
@@ -58,30 +60,36 @@ Variants {
                 }
             }
 
-            Rectangle {
-                id: rect
-                width: 50
-                height: 50
-                color: "red"
+            Repeater {
+                model: DesktopStateManager.desktopIcons.filter(icon => icon.screen === screen.name)
+                delegate: Rectangle {
+                    property var iconData: modelData
+                    id: rect
+                    width: 50
+                    height: 50
+                    color: "red"
+                    x: iconData.gridX
+                    y: iconData.gridY
 
-                Drag.mimeData: {
-                    "text/plain": "TEST"
-                }
-                Drag.dragType: Drag.Automatic
-                Drag.supportedActions: Qt.CopyAction
+                    Drag.mimeData: {
+                        "application/x-desktop-icon": iconData.inode
+                    }
+                    Drag.dragType: Drag.Automatic
+                    Drag.supportedActions: Qt.CopyAction
 
-                DragHandler {
-                    id: dragger
-                    target: null
+                    DragHandler {
+                        id: dragger
+                        target: null
 
-                    onActiveChanged: {
-                        if (active) {
-                             parent.grabToImage(function(result) {
-                                parent.Drag.imageSource = result.url
-                                parent.Drag.active = true
-                            })
-                        } else {
-                            parent.Drag.active = false
+                        onActiveChanged: {
+                            if (active) {
+                                parent.grabToImage(function(result) {
+                                    parent.Drag.imageSource = result.url
+                                    parent.Drag.active = true
+                                })
+                            } else {
+                                parent.Drag.active = false
+                            }
                         }
                     }
                 }
