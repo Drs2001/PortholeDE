@@ -7,22 +7,15 @@ Singleton {
     id: root
 
     property var test: "TEST"
-    property var desktopIcons: [
-        {
-            inode: "3464076",
-            path: "/home/dylan/Desktop/test",
-            gridX: "0",
-            gridY: "0",
-            screen: "HDMI-A-1"
-        },
-        {
-            inode: "34640767",
-            path: "/home/dylan/Desktop/test",
-            gridX: "0",
-            gridY: "0",
-            screen: "HDMI-A-1"
+    property var desktopIcons: ListModel {
+        ListElement {
+            inode: "3464076";
+            path: "/home/dylan/Desktop/test";
+            gridX: 0;
+            gridY: 0;
+            screen: "DP-3";
         }
-    ]
+    }
 
     Connections {
         target: DesktopWatcher
@@ -43,11 +36,9 @@ Singleton {
 
     }
 
-    function updateDesktopIconXY(inode, x, y) {
-        var item = desktopIcons.find(icon => icon.inode === inode)
-        item.gridX = x
-        item.gridY = y
-
-        desktopIcons = [...desktopIcons]
+    function updateDesktopIconXY(index, x, y, screen) {
+        desktopIcons.setProperty(index, "gridX", x)
+        desktopIcons.setProperty(index, "gridY", y)
+        desktopIcons.setProperty(index, "screen", screen)
     }
 }

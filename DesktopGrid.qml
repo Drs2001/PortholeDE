@@ -36,7 +36,7 @@ Variants {
                 onDropped: function(drop) {
                     var desktopPath = Quickshell.env("HOME") + "/Desktop"
 
-                    DesktopStateManager.updateDesktopIconXY(drop.getDataAsString("application/x-desktop-icon"), drop.x, drop.y)
+                    DesktopStateManager.updateDesktopIconXY(drop.getDataAsString("application/x-desktop-icon"), drop.x, drop.y, screen.name)
 
                     if(drop.hasUrls){
                         var filePath = drop.urls[0].toString().replace("file://", "")
@@ -61,21 +61,46 @@ Variants {
             }
 
             Repeater {
-                model: DesktopStateManager.desktopIcons.filter(icon => icon.screen === screen.name)
+                model: DesktopStateManager.desktopIcons
                 delegate: Rectangle {
-                    property var iconData: modelData
                     id: rect
-                    width: 50
-                    height: 50
-                    color: "red"
-                    x: iconData.gridX
-                    y: iconData.gridY
+                    property var hovered: false
+                    width: 60
+                    height: 60
+                    color: hovered ? Qt.rgba(0.47, 0.44, 1, 0.33) : "transparent"
+                    radius: 3
+                    x: gridX
+                    y: gridY
+                    visible: {
+                        if(model.screen === gridWindow.screen.name) {
+                            return true
+                        }
+                        return false
+                    }
 
+                    Image {
+                        id: iconImage
+                        anchors.fill: parent
+                        anchors.centerIn: parent
+                        anchors.margins: 4
+                        source: Quickshell.iconPath("folder", true)
+                        fillMode: Image.PreserveAspectFit
+                    }
+
+                    HoverHandler {
+                        id: baseHover
+
+                        onHoveredChanged: {
+                            rect.hovered = !rect.hovered
+                        }
+                    }
                     Drag.mimeData: {
-                        "application/x-desktop-icon": iconData.inode
+                        "application/x-desktop-icon": String(index)
                     }
                     Drag.dragType: Drag.Automatic
                     Drag.supportedActions: Qt.CopyAction
+                    Drag.imageSource: Quickshell.iconPath("folder", true)
+                    Drag.imageSourceSize: Qt.size(60, 60)
 
                     DragHandler {
                         id: dragger
@@ -83,12 +108,11 @@ Variants {
 
                         onActiveChanged: {
                             if (active) {
-                                parent.grabToImage(function(result) {
-                                    parent.Drag.imageSource = result.url
-                                    parent.Drag.active = true
-                                })
+                                parent.Drag.active = true
+                                rect.hovered = true
                             } else {
                                 parent.Drag.active = false
+                                rect.hovered = false
                             }
                         }
                     }
