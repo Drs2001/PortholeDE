@@ -65,8 +65,9 @@ Variants {
                 delegate: Rectangle {
                     id: rect
                     property var hovered: false
-                    width: 60
-                    height: 60
+                    property var iconImagePath: model.isDir ? Quickshell.iconPath("folder", true) : Quickshell.iconPath("note", true)
+                    width: 70
+                    height: content.implicitHeight + 10
                     color: hovered ? Qt.rgba(0.47, 0.44, 1, 0.33) : "transparent"
                     radius: 3
                     x: gridX
@@ -78,13 +79,29 @@ Variants {
                         return false
                     }
 
-                    Image {
-                        id: iconImage
-                        anchors.fill: parent
-                        anchors.centerIn: parent
+                    Column {
+                        id: content
+                        width: parent.width
                         anchors.margins: 4
-                        source: Quickshell.iconPath("folder", true)
-                        fillMode: Image.PreserveAspectFit
+                        spacing: 4
+                        Image {
+                            id: iconImage
+                            width: parent.width
+                            height: 50
+                            source: iconImagePath
+                            fillMode: Image.PreserveAspectFit
+                        }
+
+                        Text {
+                            id: label
+                            width: parent.width
+                            clip: true
+                            horizontalAlignment: Text.AlignHCenter
+                            elide: rect.hovered ? Text.ElideNone : Text.ElideRight
+                            wrapMode: rect.hovered ? Text.Wrap : Text.NoWrap
+                            font.pixelSize: 12
+                            text: model.name
+                        }
                     }
 
                     HoverHandler {
@@ -99,7 +116,7 @@ Variants {
                     }
                     Drag.dragType: Drag.Automatic
                     Drag.supportedActions: Qt.CopyAction
-                    Drag.imageSource: Quickshell.iconPath("folder", true)
+                    Drag.imageSource: iconImagePath
                     Drag.imageSourceSize: Qt.size(60, 60)
 
                     DragHandler {

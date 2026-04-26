@@ -33,14 +33,15 @@ Singleton {
                 var fullPath = path + filename
 
                 if (event.includes("CREATE")) {
-                    root.fileAdded(fullPath, inode)
+                    root.fileAdded(inode, filename)
                 } else if (event.includes("DELETE")) {
-                    root.fileRemoved(fullPath, inode)
+                    root.fileRemoved(inode, filename)
                 } else if (event.includes("MOVED_FROM")) {
                     renameBuffer[renameCookie] = {
                         from: fullPath,
                         to: null,
-                        inode: inode
+                        inode: inode,
+                        filename: filename
                     }
                     renameTimer.restart()
                 } else if (event.includes("MOVED_TO")) {
@@ -49,6 +50,7 @@ Singleton {
                     }
                     renameBuffer[renameCookie].to = fullPath
                     renameBuffer[renameCookie].inode = inode
+                    renameBuffer[renameCookie].filename = filename
                     renameTimer.restart()
                 }
             }
@@ -65,11 +67,11 @@ Singleton {
                 var r = renameBuffer[cookie]
 
                 if (r.from && r.to) {
-                    root.fileRenamed(r.to, r.inode)
+                    root.fileRenamed(r.inode, r.filename)
                 } else if (r.from) {
-                    root.fileRemoved(r.from, r.inode)
+                    root.fileRemoved(r.inode, r.filename)
                 } else if (r.to) {
-                    root.fileAdded(r.to, r.inode)
+                    root.fileAdded(r.inode, r.filename)
                 }
             }
 
@@ -78,7 +80,7 @@ Singleton {
     }
     
     // We use only 3 signals for simplicity as a move_from event and deleted event are essentially the same thing for this purpose
-    signal fileAdded(string path, string inode)
-    signal fileRemoved(string path, string inode)
-    signal fileRenamed(string path, string inode)
+    signal fileAdded(string inode, string filename)
+    signal fileRemoved(string inode, string filename)
+    signal fileRenamed(string inode, string filename)
 }

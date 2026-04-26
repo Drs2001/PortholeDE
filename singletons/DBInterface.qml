@@ -20,27 +20,56 @@ Singleton {
             tx.executeSql(`
                 CREATE TABLE IF NOT EXISTS desktopIcons(
                     inode TEXT PRIMARY KEY,
-                    path TEXT,
+                    name TEXT,
+                    isDir BOOL,
                     gridX INTEGER,
                     gridY INTEGER,
-                    screen TEXT
+                    screen TEXT,
+                    iconName TEXT
                 )
             `)
         })
     }
 
     // Used to either update or create a new desktop icon entry
-    function desktopIconEntryUpdate(inode, path, x, y, screen) { 
+    function desktopIconEntryUpdate(inode, name, isDir, x, y, screen, iconName) { 
         db.transaction(function(tx) {
             tx.executeSql(`
-            INSERT INTO desktopIcons (inode, path, gridX, gridY, screen)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO desktopIcons (inode, name, isDir, gridX, gridY, screen, iconName)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(inode) DO UPDATE SET
-                path   = excluded.path,
+                name   = excluded.name,
+                isDir  = excluded.isDir,
+                gridX  = excluded.gridX,
+                gridY  = excluded.gridY,
+                screen = excluded.screen,
+                iconName = excluded.iconName
+            `, [inode, name, isDir, x, y, screen, iconName])
+        })
+    }
+
+    function desktopIconEntryUpdatePos(inode, name, isDir, x, y, screen, iconName) { 
+        db.transaction(function(tx) {
+            tx.executeSql(`
+            INSERT INTO desktopIcons (inode, name, isDir, gridX, gridY, screen, iconName)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(inode) DO UPDATE SET
                 gridX  = excluded.gridX,
                 gridY  = excluded.gridY,
                 screen = excluded.screen
-            `, [inode, path, x, y, screen])
+            `, [inode, name, isDir, x, y, screen, iconName])
+        })
+    }
+
+    // Special update function that only changes the name. Used for initial boot / desktop refresh
+    function desktopIconEntryDBSync(inode, name, isDir, x, y, screen, iconName) { 
+        db.transaction(function(tx) {
+            tx.executeSql(`
+            INSERT INTO desktopIcons (inode, name, isDir, gridX, gridY, screen, iconName)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(inode) DO UPDATE SET
+                name   = excluded.name
+            `, [inode, name, isDir, x, y, screen, iconName])
         })
     }
 
@@ -68,5 +97,21 @@ Singleton {
         })
 
         return iconEntry
+    }
+
+    function desktopIconEntryGetAll() {
+        var entries = null
+
+        db.transaction(function(tx) {
+            var query = tx.executeSql(`
+            SELECT * FROM desktopIcons
+            `)
+
+            if(query.rows.length > 0) {
+                entries = query.rows
+            }
+        })
+
+        return entries
     }
 }
