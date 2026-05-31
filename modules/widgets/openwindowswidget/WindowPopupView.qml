@@ -134,18 +134,19 @@ PopupWindow {
                         z: -1
                         
                         onClicked: {
-                            if(window.workspace.id == -99){
+                            if(window.workspace.id == -98){
                                  var workspaceId = Hyprland.focusedWorkspace.id
 
                                 // We fullscreen temporarily here to fix a weird bug with hyprland where swapping workspaces while another window is fullscreend cause the sub window to turn invisible
                                 // Recreate -> open two windows in the same workspace, fullscreen one to hide the other then change the workspace of the hidden window and it will turn invisible. 
                                 // Toggling fullscreen forces a redraw because hyprland doesnt have a redraw command exposed.
                                 // (May be fixed in future hyprland releases will check back on this)
-                                window.wayland.fullscreen = true
-                                window.wayland.fullscreen = false
+                                // window.wayland.fullscreen = true
+                                // window.wayland.fullscreen = false
                                 //*****************************************************************************/
 
-                                Hyprland.dispatch("movetoworkspacesilent " + workspaceId + ", address:0x" + window.address);
+                                var dispatchStr = "hl.dsp.window.move({ workspace = " + workspaceId + ", follow = false, window = 'address:0x" + window.address + "' })"
+                                Hyprland.dispatch(dispatchStr)
                                 window.wayland.activate()
                             }
                             else{
