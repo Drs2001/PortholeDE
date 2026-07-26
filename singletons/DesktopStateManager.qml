@@ -353,6 +353,8 @@ Singleton {
     // are each icon's offset from the grabbed ("primary") icon, so the group keeps
     // its arrangement when dropped (even onto another monitor).
     property var dragItems: []
+    // Inode of the folder currently hovered as a "drop into" target ("" = none).
+    property string dragFolderTarget: ""
 
     function isDraggingInode(inode) {
         for (var i = 0; i < dragItems.length; i++) {
@@ -420,27 +422,69 @@ Singleton {
         dragScreen = screenName
         dragPosX = x
         dragPosY = y
+        // Highlight a folder if the cursor is over one (and it's not itself
+        // being dragged) — that's the "drop into folder" target.
+        dragFolderTarget = folderInodeAt(screenName, x, y, dragItems)
     }
 
     function clearDragState() {
         dragActive = false
         dragItems = []
+        dragFolderTarget = ""
     }
 
-    // Drop: place the primary icon in the cell under the cursor on the target
-    // monitor, and the rest at their relative offsets, then persist. `items` is
-    // the drag payload decoded from the drop's mime data (NOT the shared preview
-    // state), so this works regardless of when the preview gets cleared.
+    // Returns the inode of a folder occupying the cell under (x,y) on screenName,
+    // excluding any folder that's part of the drag, or "" if there's none.
+    function folderInodeAt(screenName, x, y, movingItems) {
+        var col = Math.floor(x / cellWidth)
+        var row = Math.floor(y / cellHeight)
+
+        var moving = {}
+        if (movingItems) for (var m = 0; m < movingItems.length; m++) moving[String(movingItems[m].inode)] = true
+
+        for (var i = 0; i < desktopIcons.count; i++) {
+            var e = desktopIcons.get(i)
+            if (e.screen !== screenName || !e.isDir) continue
+            if (moving[String(e.inode)]) continue
+            if (e.gridX === col && e.gridY === row) return String(e.inode)
+        }
+        return ""
+    }
+
+    // Drop handler. If the cursor is over a folder, move the dragged files INTO
+    // that folder; otherwise reposition them on the grid. `items` is decoded from
+    // the drop's mime data (not the shared preview state).
     function dropItemsAt(items, screenName, x, y) {
         if (items && items.length > 0) {
-            var so = screenObjByName(screenName)
-            var maxCols = so ? Math.max(1, Math.floor(so.width / cellWidth)) : 10
-            var maxRows = so ? Math.max(1, Math.floor(so.height / cellHeight)) : 10
-            var baseCol = Math.max(0, Math.min(Math.floor(x / cellWidth), maxCols - 1))
-            var baseRow = Math.max(0, Math.min(Math.floor(y / cellHeight), maxRows - 1))
-            moveItemsTo(items, baseCol, baseRow, screenName, maxCols, maxRows)
+            var folder = folderInodeAt(screenName, x, y, items)
+            if (folder) {
+                moveIntoFolder(items, folder)
+            } else {
+                var so = screenObjByName(screenName)
+                var maxCols = so ? Math.max(1, Math.floor(so.width / cellWidth)) : 10
+                var maxRows = so ? Math.max(1, Math.floor(so.height / cellHeight)) : 10
+                var baseCol = Math.max(0, Math.min(Math.floor(x / cellWidth), maxCols - 1))
+                var baseRow = Math.max(0, Math.min(Math.floor(y / cellHeight), maxRows - 1))
+                moveItemsTo(items, baseCol, baseRow, screenName, maxCols, maxRows)
+            }
         }
         clearDragState()
+    }
+
+    // Moves each dragged file into the target folder on disk. The DesktopWatcher
+    // sees the files leave ~/Desktop and removes them from the model/DB.
+    function moveIntoFolder(items, folderInode) {
+        var fIdx = findIndexByInode(folderInode)
+        if (fIdx === -1) return
+        var folderPath = desktopPath + "/" + desktopIcons.get(fIdx).name
+
+        for (var i = 0; i < items.length; i++) {
+            if (String(items[i].inode) === String(folderInode)) continue
+            var idx = findIndexByInode(items[i].inode)
+            if (idx === -1) continue
+            var src = desktopPath + "/" + desktopIcons.get(idx).name
+            Quickshell.execDetached({ command: ["mv", src, folderPath + "/"] })
+        }
     }
 
     // Places each item at (baseCol+relCol, baseRow+relRow) on the target screen,

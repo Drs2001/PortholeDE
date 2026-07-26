@@ -19,6 +19,8 @@ Rectangle {
     // Selection is tracked centrally (so Ctrl+click can build a multi-selection
     // across the whole grid); this reruns whenever that set is reassigned.
     property bool selected: DesktopStateManager.selectedInodes.indexOf(String(model.inode)) !== -1
+    // True when a drag is hovering this folder as a "drop into" target.
+    property bool dropTarget: DesktopStateManager.dragFolderTarget === String(model.inode)
 
     // Folders keep the plain "folder" theme icon (works reliably); files resolve
     // their MIME/.desktop icon candidate list.
@@ -32,13 +34,15 @@ Rectangle {
 
     width: 70
     height: content.implicitHeight + 10
-    // Selected: solid highlight + outline. Hover: faint highlight only.
-    color: selected ? Qt.rgba(0.47, 0.44, 1, 0.40)
+    // Drop target (green): a drag is hovering this folder. Otherwise selected
+    // (solid highlight + outline) / hover (faint highlight).
+    color: dropTarget ? Qt.rgba(0.3, 0.8, 0.45, 0.4)
+        : selected ? Qt.rgba(0.47, 0.44, 1, 0.40)
         : mouseArea.containsMouse ? Qt.rgba(0.47, 0.44, 1, 0.15)
         : "transparent"
     radius: 3
-    border.width: selected ? 1 : 0
-    border.color: Qt.rgba(0.47, 0.44, 1, 0.7)
+    border.width: (selected || dropTarget) ? 1 : 0
+    border.color: dropTarget ? Qt.rgba(0.3, 0.8, 0.45, 0.9) : Qt.rgba(0.47, 0.44, 1, 0.7)
     x: model.gridX * DesktopStateManager.cellWidth
     y: model.gridY * DesktopStateManager.cellHeight
     visible: model.screen === screenName

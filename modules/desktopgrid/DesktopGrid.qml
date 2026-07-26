@@ -179,7 +179,10 @@ Variants {
                     delegate: Column {
                         required property var modelData
                         width: 70
-                        opacity: 0.75
+                        // NOTE: opacity goes on the leaf items below, NOT here.
+                        // Group opacity (<1 on an item with children) forces an
+                        // offscreen render pass per frame per ghost, which is what
+                        // made multi-icon drags lag.
                         x: DesktopStateManager.dragPosX - dragPreview.cw / 2 + modelData.relCol * dragPreview.cw
                         y: DesktopStateManager.dragPosY - dragPreview.ch / 2 + modelData.relRow * dragPreview.ch
                         spacing: 4
@@ -187,6 +190,7 @@ Variants {
                         IconImage {
                             anchors.horizontalCenter: parent.horizontalCenter
                             implicitSize: 50
+                            opacity: 0.75
                             source: modelData.iconPath
                         }
                         Text {
@@ -195,6 +199,7 @@ Variants {
                             elide: Text.ElideRight
                             font.pixelSize: 12
                             color: "white"
+                            opacity: 0.75
                             text: modelData.displayName
                         }
                     }
