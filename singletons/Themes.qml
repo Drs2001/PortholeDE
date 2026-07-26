@@ -21,6 +21,14 @@ Singleton {
 
     property color popupBackgroundColor: activePalette.base
 
+    // Subtle text-derived overlays (adapt to light/dark palettes) for Windows 11
+    // style hover fills, input backgrounds and divider lines.
+    property color hoverOverlay: Qt.rgba(textColor.r, textColor.g, textColor.b, 0.09)
+    property color pressOverlay: Qt.rgba(textColor.r, textColor.g, textColor.b, 0.14)
+    property color subtleOverlay: Qt.rgba(textColor.r, textColor.g, textColor.b, 0.05)
+    property color dividerColor: Qt.rgba(textColor.r, textColor.g, textColor.b, 0.12)
+    property color mutedTextColor: Qt.rgba(textColor.r, textColor.g, textColor.b, 0.6)
+
     // Utility menu pallet
     property color utilButtonDisabled: disabledPalette.accent
     property color utilButtonBorder: "#3B3B3B"
