@@ -61,14 +61,17 @@ Singleton {
         })
     }
 
-    // Special update function that only changes the name. Used for initial boot / desktop refresh
-    function desktopIconEntryDBSync(inode, name, isDir, x, y, screen, iconName) { 
+    // Update function used for initial boot / desktop refresh. Only touches the
+    // name and iconName so a re-sync keeps the user's grid placement but still
+    // picks up renames and updated file-type / .desktop icons.
+    function desktopIconEntryDBSync(inode, name, isDir, x, y, screen, iconName) {
         db.transaction(function(tx) {
             tx.executeSql(`
             INSERT INTO desktopIcons (inode, name, isDir, gridX, gridY, screen, iconName)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(inode) DO UPDATE SET
-                name   = excluded.name
+                name     = excluded.name,
+                iconName = excluded.iconName
             `, [inode, name, isDir, x, y, screen, iconName])
         })
     }

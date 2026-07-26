@@ -2,6 +2,7 @@ import Quickshell
 import Quickshell.Hyprland
 import "modules/bar"
 import "modules/applauncher"
+import "modules/desktopgrid"
 
 ShellRoot{
   GlobalShortcut {

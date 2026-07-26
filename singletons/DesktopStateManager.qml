@@ -41,10 +41,38 @@ Singleton {
         }
     }
 
+    // Walks ~/Desktop and, per entry, resolves an icon-name candidate list:
+    //   - directories        -> "folder"
+    //   - .desktop launchers  -> the Icon= value from the file
+    //   - everything else     -> gio's standard::icon list (MIME-based, e.g.
+    //                            "text-plain,text-x-generic,text"), so themed
+    //                            per-filetype icons work with generic fallbacks.
+    // Output is one "inode|type|filename|iconList" row per entry.
     Process {
         id: dbSync
         running: true
-        command: ["find", desktopPath, "-mindepth", "1", "-maxdepth", "1", "-printf", "%i|%y|%f\n"]
+        command: ["sh", "-c",
+            `find "${desktopPath}" -mindepth 1 -maxdepth 1 -printf '%i|%y|%f\n' |
+            while IFS="|" read -r inode type fname; do
+                fpath="${desktopPath}/$fname"
+                if [ "$type" = "d" ]; then
+                    echo "$inode|d|$fname|folder"
+                else
+                    case "$fname" in
+                        *.desktop)
+                            icon=$(grep -m1 '^Icon=' "$fpath" | cut -d= -f2-)
+                            [ -z "$icon" ] && icon="application-x-executable"
+                            echo "$inode|f|$fname|$icon"
+                            ;;
+                        *)
+                            icons=$(gio info -a standard::icon "$fpath" 2>/dev/null | grep 'standard::icon:' | sed 's/.*standard::icon: //' | tr -d ' ')
+                            [ -z "$icons" ] && icons="application-x-generic"
+                            echo "$inode|f|$fname|$icons"
+                            ;;
+                    esac
+                fi
+            done`
+        ]
 
         stdout: StdioCollector {
             onStreamFinished: {
@@ -56,7 +84,7 @@ Singleton {
                         var info = entry.split("|")
                         // -1/-1 marks "not yet placed on the grid". refreshDesktopFromDB()
                         // assigns these a real cell the first time they're loaded.
-                        DBInterface.desktopIconEntryDBSync(info[0], info[2], (info[1] == "d"), -1, -1, defaultScreen, "")
+                        DBInterface.desktopIconEntryDBSync(info[0], info[2], (info[1] == "d"), -1, -1, defaultScreen, info[3])
                     }
                 }
 
@@ -194,5 +222,40 @@ Singleton {
 
         var entry = desktopIcons.get(idx)
         DBInterface.desktopIconEntryUpdatePos(entry.inode, entry.name, entry.isDir, entry.gridX, entry.gridY, entry.screen, entry.iconName)
+    }
+
+    // Takes the comma-separated icon-name candidate list stored for an entry
+    // (see dbSync) and returns the first name that actually resolves in the
+    // current icon theme, falling back to a generic file icon.
+    function resolveIcon(iconList) {
+        var fallback = Quickshell.iconPath("application-x-generic", true)
+        if (!iconList) return fallback
+
+        var candidates = String(iconList).split(",")
+        for (var i = 0; i < candidates.length; i++) {
+            var name = candidates[i].trim()
+            if (!name) continue
+            var p = Quickshell.iconPath(name, true)
+            if (p) return p
+        }
+        return fallback
+    }
+
+    // Double-click activation: launch .desktop entries, open folders in the
+    // file manager, and hand every other file to the system default handler.
+    function activateIcon(inode) {
+        var idx = findIndexByInode(inode)
+        if (idx === -1) return
+
+        var entry = desktopIcons.get(idx)
+        var fpath = desktopPath + "/" + entry.name
+
+        if (entry.isDir) {
+            Quickshell.execDetached({ command: ["nautilus", fpath] })
+        } else if (String(entry.name).endsWith(".desktop")) {
+            Quickshell.execDetached({ command: ["gio", "launch", fpath] })
+        } else {
+            Quickshell.execDetached({ command: ["xdg-open", fpath] })
+        }
     }
 }
