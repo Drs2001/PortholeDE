@@ -35,8 +35,13 @@ Variants {
 
                 onDropped: function(drop) {
                     var desktopPath = Quickshell.env("HOME") + "/Desktop"
+                    var draggedInode = drop.getDataAsString("application/x-desktop-icon")
 
-                    DesktopStateManager.updateDesktopIconXY(drop.getDataAsString("application/x-desktop-icon"), drop.x, drop.y, screen.name)
+                    if (draggedInode) {
+                        var maxCols = Math.max(1, Math.floor(gridWindow.width / DesktopStateManager.cellWidth))
+                        var maxRows = Math.max(1, Math.floor(gridWindow.height / DesktopStateManager.cellHeight))
+                        DesktopStateManager.updateDesktopIconXY(draggedInode, drop.x, drop.y, screen.name, maxCols, maxRows)
+                    }
 
                     if(drop.hasUrls){
                         var filePath = drop.urls[0].toString().replace("file://", "")
@@ -70,8 +75,8 @@ Variants {
                     height: content.implicitHeight + 10
                     color: hovered ? Qt.rgba(0.47, 0.44, 1, 0.33) : "transparent"
                     radius: 3
-                    x: gridX
-                    y: gridY
+                    x: gridX * DesktopStateManager.cellWidth
+                    y: gridY * DesktopStateManager.cellHeight
                     visible: {
                         if(model.screen === gridWindow.screen.name) {
                             return true
@@ -112,7 +117,7 @@ Variants {
                         }
                     }
                     Drag.mimeData: {
-                        "application/x-desktop-icon": String(index)
+                        "application/x-desktop-icon": String(model.inode)
                     }
                     Drag.dragType: Drag.Automatic
                     Drag.supportedActions: Qt.CopyAction

@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Widgets
 import qs.singletons
 
 Item {
@@ -17,11 +18,9 @@ Item {
             spacing: 8
 
             // Temporary solution for displaying icons, doesnt fully work and some icons look pixelated
-            Image {
-                source: Quickshell.iconPath(application.icon, true)
-                height: 24
-                width: 24
-                fillMode: Image.PreserveAspectFit
+            IconImage {
+                source: Quickshell.iconPath(application.icon, "application-default-icon")
+                implicitSize: 24
             }
             Text{
                 text: application.name
