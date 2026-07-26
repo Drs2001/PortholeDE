@@ -316,6 +316,29 @@ Singleton {
         if (selectedInodes.length > 0) selectedInodes = []
     }
 
+    // Rubber-band selection: select every icon on `screenName` whose box
+    // intersects the rectangle (given by two opposite corners, in that window's
+    // pixels), unioned with `baseInodes` (the selection to preserve, e.g. when
+    // Ctrl is held). Called live as the marquee is dragged.
+    function selectInRect(x1, y1, x2, y2, screenName, baseInodes) {
+        var minX = Math.min(x1, x2), maxX = Math.max(x1, x2)
+        var minY = Math.min(y1, y2), maxY = Math.max(y1, y2)
+        var iconW = 70, iconH = 80
+
+        var result = baseInodes ? baseInodes.slice() : []
+        for (var i = 0; i < desktopIcons.count; i++) {
+            var e = desktopIcons.get(i)
+            if (e.screen !== screenName) continue
+            var ix = e.gridX * cellWidth
+            var iy = e.gridY * cellHeight
+            if (ix < maxX && ix + iconW > minX && iy < maxY && iy + iconH > minY) {
+                var s = String(e.inode)
+                if (result.indexOf(s) === -1) result.push(s)
+            }
+        }
+        selectedInodes = result
+    }
+
     // ── Drag (multi-select move with live preview) ───────────────────────────
     // Uses native Qt DnD purely for cross-monitor event ROUTING: each grid
     // window's DropArea reports which monitor the cursor is over and the local

@@ -73,14 +73,45 @@ Variants {
             }
 
             MouseArea {
+                id: bgMouse
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                 anchors.fill: parent
 
+                // Rubber-band (marquee) selection state.
+                property bool marqueeActive: false
+                property real startX: 0
+                property real startY: 0
+                property real curX: 0
+                property real curY: 0
+                property var marqueeBase: []
+
+                onPressed: mouse => {
+                    if (mouse.button === Qt.LeftButton) {
+                        // Ctrl keeps the existing selection and adds to it.
+                        var additive = (mouse.modifiers & Qt.ControlModifier)
+                        marqueeBase = additive ? DesktopStateManager.selectedInodes.slice() : []
+                        if (!additive) DesktopStateManager.clearSelection()
+
+                        marqueeActive = true
+                        startX = mouse.x; startY = mouse.y
+                        curX = mouse.x; curY = mouse.y
+                    }
+                }
+
+                onPositionChanged: mouse => {
+                    if (marqueeActive) {
+                        curX = mouse.x; curY = mouse.y
+                        DesktopStateManager.selectInRect(startX, startY, curX, curY,
+                            gridWindow.screen.name, marqueeBase)
+                    }
+                }
+
+                onReleased: mouse => {
+                    marqueeActive = false
+                }
+
                 onClicked: event => {
-                    if (event.button === Qt.LeftButton) {
-                        // Clicking empty desktop drops the current selection.
-                        DesktopStateManager.clearSelection()
-                    } else if (event.button === Qt.RightButton) {
+                    if (event.button === Qt.RightButton) {
                         //TODO: Add right click menu that communicates with all windows
                     }
                 }
@@ -91,6 +122,20 @@ Variants {
                 delegate: DesktopIcon {
                     screenName: gridWindow.screen.name
                 }
+            }
+
+            // Blue rubber-band selection rectangle (drawn above the icons).
+            Rectangle {
+                id: marqueeRect
+                z: 50
+                visible: bgMouse.marqueeActive
+                x: Math.min(bgMouse.startX, bgMouse.curX)
+                y: Math.min(bgMouse.startY, bgMouse.curY)
+                width: Math.abs(bgMouse.curX - bgMouse.startX)
+                height: Math.abs(bgMouse.curY - bgMouse.startY)
+                color: Qt.rgba(0.3, 0.5, 1, 0.22)
+                border.width: 1
+                border.color: Qt.rgba(0.3, 0.5, 1, 0.9)
             }
 
             // Live drag preview, drawn on whichever monitor currently has the
