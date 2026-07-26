@@ -102,16 +102,36 @@ PanelWindow {
                     fillMode: Image.PreserveAspectFit
                     mipmap: true
                 }
-                Text {
+                ColumnLayout {
                     Layout.fillWidth: true
-                    text: modelData.body
-                    color: Themes.textColor
-                    font.family: Themes.textFont
-                    // Wrap within the fixed width (breaks long unbroken strings too)
-                    // and cap the height so a huge message can't grow off screen.
-                    wrapMode: Text.Wrap
-                    maximumLineCount: 6
-                    elide: Text.ElideRight
+                    Layout.alignment: Qt.AlignVCenter
+                    spacing: 2
+
+                    // Title (summary) — bold, like a Windows toast.
+                    Text {
+                        visible: modelData.summary != ""
+                        text: modelData.summary
+                        color: Themes.textColor
+                        font.family: Themes.textFont
+                        font.bold: true
+                        wrapMode: Text.Wrap
+                        maximumLineCount: 2
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                    }
+                    Text {
+                        visible: modelData.body != ""
+                        text: modelData.body
+                        color: Themes.textColor
+                        font.family: Themes.textFont
+                        // Wrap within the fixed width (breaks long unbroken strings
+                        // too) and cap the height so a huge message can't grow off
+                        // screen.
+                        wrapMode: Text.Wrap
+                        maximumLineCount: 5
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                    }
                 }
             }
         }
