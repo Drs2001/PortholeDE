@@ -2,6 +2,8 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Controls
 import Quickshell
+import Quickshell.Wayland
+import Quickshell.Widgets
 import qs.singletons
 
 Variants {
@@ -20,34 +22,52 @@ Variants {
         aboveWindows: false
         color: "transparent"
 
+        // Without on-demand keyboard focus, a layer-shell surface never receives
+        // modifier state, so pointer events report modifiers == 0 and Ctrl+click
+        // can't be distinguished from a plain click.
+        WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+
         Rectangle {
             anchors.fill: parent
             color: "transparent"
 
+            // Receives both files dragged in from other apps AND desktop-icon
+            // drags (the native DnD is what carries an icon drag across monitors
+            // to the target screen's DropArea).
             DropArea {
+                id: dropArea
                 anchors.fill: parent
 
+                readonly property string iconMime: "application/x-porthole-desktop-icon"
+
                 onEntered: function(drag) {
-                    if(drag.hasUrls) {
+                    if (drag.hasUrls || drag.formats.indexOf(iconMime) !== -1) {
                         drag.accept()
+                    }
+                    if (!drag.hasUrls) {
+                        DesktopStateManager.updateDragHover(gridWindow.screen.name, drag.x, drag.y)
+                    }
+                }
+
+                onPositionChanged: function(drag) {
+                    if (!drag.hasUrls) {
+                        DesktopStateManager.updateDragHover(gridWindow.screen.name, drag.x, drag.y)
                     }
                 }
 
                 onDropped: function(drop) {
-                    var desktopPath = Quickshell.env("HOME") + "/Desktop"
-                    var draggedInode = drop.getDataAsString("application/x-desktop-icon")
-
-                    if (draggedInode) {
-                        var maxCols = Math.max(1, Math.floor(gridWindow.width / DesktopStateManager.cellWidth))
-                        var maxRows = Math.max(1, Math.floor(gridWindow.height / DesktopStateManager.cellHeight))
-                        DesktopStateManager.updateDesktopIconXY(draggedInode, drop.x, drop.y, screen.name, maxCols, maxRows)
-                    }
-
-                    if(drop.hasUrls){
+                    if (drop.hasUrls) {
+                        var desktopPath = Quickshell.env("HOME") + "/Desktop"
                         var filePath = drop.urls[0].toString().replace("file://", "")
                         Quickshell.execDetached({
                             command: ["mv", filePath, desktopPath]
                         });
+                        return
+                    }
+
+                    var raw = drop.getDataAsString(iconMime)
+                    if (raw) {
+                        DesktopStateManager.dropItemsAt(JSON.parse(raw), gridWindow.screen.name, drop.x, drop.y)
                     }
                 }
             }
@@ -58,7 +78,8 @@ Variants {
 
                 onClicked: event => {
                     if (event.button === Qt.LeftButton) {
-
+                        // Clicking empty desktop drops the current selection.
+                        DesktopStateManager.clearSelection()
                     } else if (event.button === Qt.RightButton) {
                         //TODO: Add right click menu that communicates with all windows
                     }
@@ -69,6 +90,69 @@ Variants {
                 model: DesktopStateManager.desktopIcons
                 delegate: DesktopIcon {
                     screenName: gridWindow.screen.name
+                }
+            }
+
+            // Live drag preview, drawn on whichever monitor currently has the
+            // cursor (dragScreen): target-cell outlines at the snapped drop
+            // location, plus ghost icons following the cursor — for one or all
+            // selected icons. Because it only renders when dragScreen matches this
+            // window, the preview naturally hops monitors as the cursor crosses.
+            Item {
+                id: dragPreview
+                anchors.fill: parent
+                z: 100
+                visible: DesktopStateManager.dragActive
+                         && DesktopStateManager.dragScreen === gridWindow.screen.name
+
+                property real cw: DesktopStateManager.cellWidth
+                property real ch: DesktopStateManager.cellHeight
+                // Cell under the cursor = where the grabbed (primary) icon lands.
+                property int baseCol: Math.floor(DesktopStateManager.dragPosX / cw)
+                property int baseRow: Math.floor(DesktopStateManager.dragPosY / ch)
+
+                // Snapped target-cell outlines (primary + relative offsets).
+                Repeater {
+                    model: DesktopStateManager.dragItems
+                    delegate: Rectangle {
+                        required property var modelData
+                        width: 70
+                        height: 80
+                        x: Math.max(0, dragPreview.baseCol + modelData.relCol) * dragPreview.cw
+                        y: Math.max(0, dragPreview.baseRow + modelData.relRow) * dragPreview.ch
+                        color: Qt.rgba(0.47, 0.44, 1, 0.12)
+                        radius: 3
+                        border.width: 2
+                        border.color: Qt.rgba(0.47, 0.44, 1, 0.85)
+                    }
+                }
+
+                // Ghost icons following the cursor: primary centered on the
+                // cursor, the rest offset by their relative grid position.
+                Repeater {
+                    model: DesktopStateManager.dragItems
+                    delegate: Column {
+                        required property var modelData
+                        width: 70
+                        opacity: 0.75
+                        x: DesktopStateManager.dragPosX - dragPreview.cw / 2 + modelData.relCol * dragPreview.cw
+                        y: DesktopStateManager.dragPosY - dragPreview.ch / 2 + modelData.relRow * dragPreview.ch
+                        spacing: 4
+
+                        IconImage {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            implicitSize: 50
+                            source: modelData.iconPath
+                        }
+                        Text {
+                            width: parent.width
+                            horizontalAlignment: Text.AlignHCenter
+                            elide: Text.ElideRight
+                            font.pixelSize: 12
+                            color: "white"
+                            text: modelData.displayName
+                        }
+                    }
                 }
             }
         }

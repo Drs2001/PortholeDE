@@ -16,7 +16,10 @@ Rectangle {
     // model.xxx binding below.
     property string screenName
 
-    property bool hovered: false
+    // Selection is tracked centrally (so Ctrl+click can build a multi-selection
+    // across the whole grid); this reruns whenever that set is reassigned.
+    property bool selected: DesktopStateManager.selectedInodes.indexOf(String(model.inode)) !== -1
+
     // Folders keep the plain "folder" theme icon (works reliably); files resolve
     // their MIME/.desktop icon candidate list.
     property string iconImagePath: model.isDir
@@ -29,11 +32,18 @@ Rectangle {
 
     width: 70
     height: content.implicitHeight + 10
-    color: hovered ? Qt.rgba(0.47, 0.44, 1, 0.33) : "transparent"
+    // Selected: solid highlight + outline. Hover: faint highlight only.
+    color: selected ? Qt.rgba(0.47, 0.44, 1, 0.40)
+        : mouseArea.containsMouse ? Qt.rgba(0.47, 0.44, 1, 0.15)
+        : "transparent"
     radius: 3
+    border.width: selected ? 1 : 0
+    border.color: Qt.rgba(0.47, 0.44, 1, 0.7)
     x: model.gridX * DesktopStateManager.cellWidth
     y: model.gridY * DesktopStateManager.cellHeight
     visible: model.screen === screenName
+    // Dim the real icon while it's being dragged; the ghost preview stands in.
+    opacity: (DesktopStateManager.dragActive && DesktopStateManager.isDraggingInode(String(model.inode))) ? 0.35 : 1.0
 
     Column {
         id: content
@@ -52,31 +62,46 @@ Rectangle {
             width: parent.width
             clip: true
             horizontalAlignment: Text.AlignHCenter
-            elide: rect.hovered ? Text.ElideNone : Text.ElideRight
-            wrapMode: rect.hovered ? Text.Wrap : Text.NoWrap
+            // Only the selected icon expands to show its full name.
+            elide: rect.selected ? Text.ElideNone : Text.ElideRight
+            wrapMode: rect.selected ? Text.Wrap : Text.NoWrap
             font.pixelSize: 12
             text: rect.displayName
         }
     }
 
-    HoverHandler {
-        id: baseHover
-        onHoveredChanged: rect.hovered = baseHover.hovered
-    }
-
-    // Double-click launches the app / opens the folder / opens the file.
-    TapHandler {
+    // Handles selection + open. Coexists with the DragHandler below: on a plain
+    // press/release it emits clicks, but once the pointer moves past the drag
+    // threshold the DragHandler steals the grab and starts a drag instead.
+    MouseArea {
+        id: mouseArea
+        anchors.fill: parent
+        hoverEnabled: true
         acceptedButtons: Qt.LeftButton
-        onDoubleTapped: DesktopStateManager.activateIcon(model.inode)
+
+        onClicked: mouse => {
+            if (mouse.modifiers & Qt.ControlModifier) {
+                DesktopStateManager.toggleSelection(model.inode)
+            } else {
+                DesktopStateManager.selectOnly(model.inode)
+            }
+        }
+        onDoubleClicked: DesktopStateManager.activateIcon(model.inode)
     }
 
-    Drag.mimeData: {
-        "application/x-desktop-icon": String(model.inode)
-    }
+    // Native Qt DnD is used ONLY to route drag events across monitors (each grid
+    // window's DropArea receives them). The moving payload travels in the mime
+    // data as JSON so the drop is self-contained (independent of when the shared
+    // preview state is cleared). No Drag.imageSource is set — the custom ghost
+    // preview stands in for it.
     Drag.dragType: Drag.Automatic
-    Drag.supportedActions: Qt.CopyAction
-    Drag.imageSource: rect.iconImagePath
-    Drag.imageSourceSize: Qt.size(60, 60)
+    Drag.supportedActions: Qt.MoveAction
+
+    // Cleared only when the whole drag truly ends (dropped or cancelled). We must
+    // NOT clear on DragHandler.active going false: during a native drag that fires
+    // as soon as the pointer leaves this monitor, which would wipe the preview
+    // mid-drag right when it should be hopping to the next screen.
+    Drag.onDragFinished: DesktopStateManager.clearDragState()
 
     DragHandler {
         id: dragger
@@ -84,11 +109,14 @@ Rectangle {
 
         onActiveChanged: {
             if (active) {
+                DesktopStateManager.beginDrag(model.inode, rect.screenName)
+                // Populate mime data AFTER beginDrag has built the item list.
+                rect.Drag.mimeData = {
+                    "application/x-porthole-desktop-icon": JSON.stringify(DesktopStateManager.dragItems)
+                }
                 rect.Drag.active = true
-                rect.hovered = true
             } else {
                 rect.Drag.active = false
-                rect.hovered = false
             }
         }
     }

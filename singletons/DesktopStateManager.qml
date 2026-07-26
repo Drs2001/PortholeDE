@@ -9,6 +9,10 @@ Singleton {
     property var desktopPath: Quickshell.env("HOME") + "/Desktop"
     property var desktopIcons: ListModel {}
 
+    // Inodes (as strings) of the currently-selected icons. Reassigned as a whole
+    // on every change so delegate bindings re-evaluate.
+    property var selectedInodes: []
+
     // Grid cell size in pixels. gridX/gridY (both in this model and in the DB)
     // are CELL INDICES (column/row), not raw pixel coordinates. DesktopGrid.qml
     // multiplies by these to get the actual on-screen position.
@@ -38,6 +42,7 @@ Singleton {
                 var realInode = desktopIcons.get(idx).inode
                 desktopIcons.remove(idx)
                 DBInterface.desktopIconEntryRemove(realInode)
+                if (isSelected(realInode)) toggleSelection(realInode)
             }
         }
         function onFileRenamed(inode, filename){
@@ -286,6 +291,187 @@ Singleton {
         return -1
     }
 
+    // ── Selection ────────────────────────────────────────────────────────────
+    function isSelected(inode) {
+        return selectedInodes.indexOf(String(inode)) !== -1
+    }
+
+    // Plain left-click: this icon becomes the sole selection.
+    function selectOnly(inode) {
+        selectedInodes = [String(inode)]
+    }
+
+    // Ctrl+click: add/remove this icon from the multi-selection.
+    function toggleSelection(inode) {
+        var s = String(inode)
+        var arr = selectedInodes.slice()
+        var i = arr.indexOf(s)
+        if (i === -1) arr.push(s)
+        else arr.splice(i, 1)
+        selectedInodes = arr
+    }
+
+    // Click on empty desktop: drop the whole selection.
+    function clearSelection() {
+        if (selectedInodes.length > 0) selectedInodes = []
+    }
+
+    // ── Drag (multi-select move with live preview) ───────────────────────────
+    // Uses native Qt DnD purely for cross-monitor event ROUTING: each grid
+    // window's DropArea reports which monitor the cursor is over and the local
+    // coordinates there (updateDragHover / dropDrag). The moving payload lives
+    // in dragItems here, and DesktopGrid renders the ghost preview off this
+    // state on whichever monitor currently has the cursor (dragScreen).
+    property bool dragActive: false
+    property string dragScreen: ""      // monitor the cursor is currently over
+    property real dragPosX: 0           // cursor position, local to dragScreen
+    property real dragPosY: 0
+    // [{inode, gridX, gridY, relCol, relRow, iconPath, displayName}] — relCol/relRow
+    // are each icon's offset from the grabbed ("primary") icon, so the group keeps
+    // its arrangement when dropped (even onto another monitor).
+    property var dragItems: []
+
+    function isDraggingInode(inode) {
+        for (var i = 0; i < dragItems.length; i++) {
+            if (dragItems[i].inode === String(inode)) return true
+        }
+        return false
+    }
+
+    function displayNameFor(name) {
+        var n = String(name)
+        return n.endsWith(".desktop") ? n.slice(0, -8) : n
+    }
+
+    function screenObjByName(name) {
+        for (var i = 0; i < Quickshell.screens.length; i++) {
+            if (Quickshell.screens[i].name === name) return Quickshell.screens[i]
+        }
+        return null
+    }
+
+    // Drag start. If the grabbed icon is part of a multi-selection the whole
+    // selection (on this monitor) moves together; otherwise it becomes the sole
+    // selection. Only icons on the primary's monitor join the drag, so their
+    // relative offsets are well-defined.
+    function beginDrag(primaryInode, screenName) {
+        var inodes
+        if (isSelected(primaryInode) && selectedInodes.length > 1) {
+            inodes = selectedInodes.slice()
+        } else {
+            selectOnly(primaryInode)
+            inodes = [String(primaryInode)]
+        }
+
+        var pIdx = findIndexByInode(primaryInode)
+        if (pIdx === -1) return
+        var p = desktopIcons.get(pIdx)
+
+        var items = []
+        for (var i = 0; i < inodes.length; i++) {
+            var idx = findIndexByInode(inodes[i])
+            if (idx === -1) continue
+            var e = desktopIcons.get(idx)
+            if (e.screen !== screenName) continue
+            items.push({
+                inode: String(e.inode),
+                gridX: e.gridX,
+                gridY: e.gridY,
+                relCol: e.gridX - p.gridX,
+                relRow: e.gridY - p.gridY,
+                iconPath: e.isDir ? Quickshell.iconPath("folder", true) : resolveIcon(e.iconName),
+                displayName: displayNameFor(e.name)
+            })
+        }
+
+        dragItems = items
+        dragScreen = screenName
+        dragPosX = (p.gridX + 0.5) * cellWidth
+        dragPosY = (p.gridY + 0.5) * cellHeight
+        dragActive = true
+    }
+
+    // Called continuously by the DropArea under the cursor.
+    function updateDragHover(screenName, x, y) {
+        if (!dragActive) return
+        dragScreen = screenName
+        dragPosX = x
+        dragPosY = y
+    }
+
+    function clearDragState() {
+        dragActive = false
+        dragItems = []
+    }
+
+    // Drop: place the primary icon in the cell under the cursor on the target
+    // monitor, and the rest at their relative offsets, then persist. `items` is
+    // the drag payload decoded from the drop's mime data (NOT the shared preview
+    // state), so this works regardless of when the preview gets cleared.
+    function dropItemsAt(items, screenName, x, y) {
+        if (items && items.length > 0) {
+            var so = screenObjByName(screenName)
+            var maxCols = so ? Math.max(1, Math.floor(so.width / cellWidth)) : 10
+            var maxRows = so ? Math.max(1, Math.floor(so.height / cellHeight)) : 10
+            var baseCol = Math.max(0, Math.min(Math.floor(x / cellWidth), maxCols - 1))
+            var baseRow = Math.max(0, Math.min(Math.floor(y / cellHeight), maxRows - 1))
+            moveItemsTo(items, baseCol, baseRow, screenName, maxCols, maxRows)
+        }
+        clearDragState()
+    }
+
+    // Places each item at (baseCol+relCol, baseRow+relRow) on the target screen,
+    // resolving collisions against static (non-moving) icons and each other.
+    // Also reassigns each icon's monitor (screen) so cross-monitor drops persist.
+    function moveItemsTo(items, baseCol, baseRow, screen, maxCols, maxRows) {
+        var moving = {}
+        for (var i = 0; i < items.length; i++) moving[items[i].inode] = true
+
+        var taken = {}
+        function cellKey(c, r) { return c + "," + r }
+
+        function occupiedByStatic(col, row) {
+            for (var k = 0; k < desktopIcons.count; k++) {
+                var e = desktopIcons.get(k)
+                if (e.screen !== screen) continue
+                if (moving[String(e.inode)]) continue
+                if (e.gridX === col && e.gridY === row) return true
+            }
+            return false
+        }
+
+        function freeCell(col, row) {
+            col = Math.max(0, Math.min(col, maxCols - 1))
+            row = Math.max(0, Math.min(row, maxRows - 1))
+            if (!occupiedByStatic(col, row) && !taken[cellKey(col, row)]) return { col: col, row: row }
+            var maxRadius = Math.max(maxCols, maxRows)
+            for (var radius = 1; radius <= maxRadius; radius++) {
+                for (var dy = -radius; dy <= radius; dy++) {
+                    for (var dx = -radius; dx <= radius; dx++) {
+                        if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue
+                        var c = col + dx, r = row + dy
+                        if (c < 0 || c >= maxCols || r < 0 || r >= maxRows) continue
+                        if (!occupiedByStatic(c, r) && !taken[cellKey(c, r)]) return { col: c, row: r }
+                    }
+                }
+            }
+            return { col: col, row: row }
+        }
+
+        for (var j = 0; j < items.length; j++) {
+            var it = items[j]
+            var cell = freeCell(baseCol + it.relCol, baseRow + it.relRow)
+            taken[cellKey(cell.col, cell.row)] = true
+            var idx = findIndexByInode(it.inode)
+            if (idx === -1) continue
+            desktopIcons.setProperty(idx, "gridX", cell.col)
+            desktopIcons.setProperty(idx, "gridY", cell.row)
+            desktopIcons.setProperty(idx, "screen", screen)
+            var e2 = desktopIcons.get(idx)
+            DBInterface.desktopIconEntryUpdatePos(e2.inode, e2.name, e2.isDir, e2.gridX, e2.gridY, e2.screen, e2.iconName)
+        }
+    }
+
     function isOccupied(col, row, screen, excludeInode) {
         for (var i = 0; i < desktopIcons.count; i++) {
             var e = desktopIcons.get(i)
@@ -326,26 +512,6 @@ Singleton {
         // Grid is completely full: fall back to the originally requested cell
         // (results in an overlap, but avoids silently dropping the icon)
         return { col: col, row: row }
-    }
-
-    // pixelX/pixelY are raw drop coordinates within the target screen's grid
-    // window. maxCols/maxRows are that screen's grid capacity, computed by
-    // DesktopGrid.qml from its own window size (so it's correct per-monitor).
-    function updateDesktopIconXY(inode, pixelX, pixelY, screen, maxCols, maxRows) {
-        var idx = findIndexByInode(inode)
-        if (idx === -1) return
-
-        var col = Math.floor(pixelX / cellWidth)
-        var row = Math.floor(pixelY / cellHeight)
-
-        var cell = findFreeCell(col, row, screen, maxCols, maxRows, inode)
-
-        desktopIcons.setProperty(idx, "gridX", cell.col)
-        desktopIcons.setProperty(idx, "gridY", cell.row)
-        desktopIcons.setProperty(idx, "screen", screen)
-
-        var entry = desktopIcons.get(idx)
-        DBInterface.desktopIconEntryUpdatePos(entry.inode, entry.name, entry.isDir, entry.gridX, entry.gridY, entry.screen, entry.iconName)
     }
 
     // Takes the comma-separated icon-name candidate list stored for an entry
