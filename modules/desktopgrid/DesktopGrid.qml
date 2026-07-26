@@ -77,37 +77,29 @@ Variants {
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                 anchors.fill: parent
 
-                // Rubber-band (marquee) selection state.
-                property bool marqueeActive: false
-                property real startX: 0
-                property real startY: 0
-                property real curX: 0
-                property real curY: 0
-                property var marqueeBase: []
+                // Local pixels -> shared "virtual global" space (see
+                // DesktopStateManager), so the marquee can span monitors.
+                readonly property real originX: gridWindow.screen.x
+                readonly property real originY: gridWindow.screen.y
 
                 onPressed: mouse => {
                     if (mouse.button === Qt.LeftButton) {
                         // Ctrl keeps the existing selection and adds to it.
                         var additive = (mouse.modifiers & Qt.ControlModifier)
-                        marqueeBase = additive ? DesktopStateManager.selectedInodes.slice() : []
+                        var base = additive ? DesktopStateManager.selectedInodes.slice() : []
                         if (!additive) DesktopStateManager.clearSelection()
-
-                        marqueeActive = true
-                        startX = mouse.x; startY = mouse.y
-                        curX = mouse.x; curY = mouse.y
+                        DesktopStateManager.beginMarquee(originX + mouse.x, originY + mouse.y, base)
                     }
                 }
 
                 onPositionChanged: mouse => {
-                    if (marqueeActive) {
-                        curX = mouse.x; curY = mouse.y
-                        DesktopStateManager.selectInRect(startX, startY, curX, curY,
-                            gridWindow.screen.name, marqueeBase)
+                    if (DesktopStateManager.marqueeActive) {
+                        DesktopStateManager.updateMarquee(originX + mouse.x, originY + mouse.y)
                     }
                 }
 
                 onReleased: mouse => {
-                    marqueeActive = false
+                    DesktopStateManager.endMarquee()
                 }
 
                 onClicked: event => {
@@ -124,15 +116,18 @@ Variants {
                 }
             }
 
-            // Blue rubber-band selection rectangle (drawn above the icons).
+            // Blue rubber-band selection rectangle (drawn above the icons). The
+            // rectangle lives in shared global coords; each monitor converts it to
+            // its own local space (subtracting screen.x/y) and the window clips it,
+            // so a marquee spanning monitors shows its slice on each one.
             Rectangle {
                 id: marqueeRect
                 z: 50
-                visible: bgMouse.marqueeActive
-                x: Math.min(bgMouse.startX, bgMouse.curX)
-                y: Math.min(bgMouse.startY, bgMouse.curY)
-                width: Math.abs(bgMouse.curX - bgMouse.startX)
-                height: Math.abs(bgMouse.curY - bgMouse.startY)
+                visible: DesktopStateManager.marqueeActive
+                x: Math.min(DesktopStateManager.marqueeX1, DesktopStateManager.marqueeX2) - gridWindow.screen.x
+                y: Math.min(DesktopStateManager.marqueeY1, DesktopStateManager.marqueeY2) - gridWindow.screen.y
+                width: Math.abs(DesktopStateManager.marqueeX2 - DesktopStateManager.marqueeX1)
+                height: Math.abs(DesktopStateManager.marqueeY2 - DesktopStateManager.marqueeY1)
                 color: Qt.rgba(0.3, 0.5, 1, 0.22)
                 border.width: 1
                 border.color: Qt.rgba(0.3, 0.5, 1, 0.9)

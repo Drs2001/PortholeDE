@@ -316,11 +316,38 @@ Singleton {
         if (selectedInodes.length > 0) selectedInodes = []
     }
 
-    // Rubber-band selection: select every icon on `screenName` whose box
-    // intersects the rectangle (given by two opposite corners, in that window's
-    // pixels), unioned with `baseInodes` (the selection to preserve, e.g. when
-    // Ctrl is held). Called live as the marquee is dragged.
-    function selectInRect(x1, y1, x2, y2, screenName, baseInodes) {
+    // ── Rubber-band (marquee) selection ──────────────────────────────────────
+    // The rectangle is tracked in a shared "virtual global" coordinate space
+    // (each monitor's screen.x/screen.y + window-local pixels) so the box can be
+    // dragged across monitors: the origin window keeps the pointer grab, and
+    // every grid window renders the slice of the rectangle that overlaps it.
+    property bool marqueeActive: false
+    property real marqueeX1: 0
+    property real marqueeY1: 0
+    property real marqueeX2: 0
+    property real marqueeY2: 0
+    property var marqueeBase: []
+
+    function beginMarquee(gx, gy, baseInodes) {
+        marqueeBase = baseInodes ? baseInodes : []
+        marqueeX1 = gx; marqueeY1 = gy
+        marqueeX2 = gx; marqueeY2 = gy
+        marqueeActive = true
+    }
+
+    function updateMarquee(gx, gy) {
+        if (!marqueeActive) return
+        marqueeX2 = gx; marqueeY2 = gy
+        selectInRectGlobal(marqueeX1, marqueeY1, marqueeX2, marqueeY2, marqueeBase)
+    }
+
+    function endMarquee() {
+        marqueeActive = false
+    }
+
+    // Selects every icon (on ANY monitor) whose box intersects the global
+    // rectangle, unioned with `baseInodes` (preserved when Ctrl is held).
+    function selectInRectGlobal(x1, y1, x2, y2, baseInodes) {
         var minX = Math.min(x1, x2), maxX = Math.max(x1, x2)
         var minY = Math.min(y1, y2), maxY = Math.max(y1, y2)
         var iconW = 70, iconH = 80
@@ -328,9 +355,10 @@ Singleton {
         var result = baseInodes ? baseInodes.slice() : []
         for (var i = 0; i < desktopIcons.count; i++) {
             var e = desktopIcons.get(i)
-            if (e.screen !== screenName) continue
-            var ix = e.gridX * cellWidth
-            var iy = e.gridY * cellHeight
+            var so = screenObjByName(e.screen)
+            if (!so) continue
+            var ix = so.x + e.gridX * cellWidth
+            var iy = so.y + e.gridY * cellHeight
             if (ix < maxX && ix + iconW > minX && iy < maxY && iy + iconH > minY) {
                 var s = String(e.inode)
                 if (result.indexOf(s) === -1) result.push(s)
