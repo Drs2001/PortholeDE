@@ -76,6 +76,20 @@ Singleton {
         })
     }
 
+    // Deletes any rows whose inode isn't in the provided list. Used by the boot
+    // sync to drop entries for files that were removed while the shell wasn't
+    // running (or that leaked in from earlier buggy delete handling).
+    function desktopIconEntryKeepOnly(inodes) {
+        db.transaction(function(tx) {
+            if (!inodes || inodes.length === 0) {
+                tx.executeSql(`DELETE FROM desktopIcons`)
+                return
+            }
+            var placeholders = inodes.map(function() { return "?" }).join(",")
+            tx.executeSql(`DELETE FROM desktopIcons WHERE inode NOT IN (` + placeholders + `)`, inodes)
+        })
+    }
+
     function desktopIconEntryRemove(inode) {
         db.transaction(function(tx) {
             tx.executeSql(`

@@ -20,25 +20,129 @@ Singleton {
 
         function onFileAdded(inode, filename){
             console.log("FILE Added: ", inode)
-            // NOTE: DesktopWatcher only gives us inode + filename, not whether
-            // it's a directory. Wiring this up properly requires a stat call
-            // (similar to dbSync below) before we can insert a full DB row.
+            // We only get inode + filename here, not the file type or its icon,
+            // so queue the filename and resolve those in a subprocess (same logic
+            // as the boot sync) before inserting a DB row / grid entry.
+            enqueueAdd(filename)
         }
         function onFileRemoved(inode, filename){
             console.log("FILE Removed: ", inode)
+            // A deleted file can't be stat'd, so the watcher reports inode "0".
+            // Fall back to matching by filename and remove the row by its REAL
+            // inode, otherwise stale/duplicate DB rows pile up forever.
             var idx = findIndexByInode(inode)
-            if (idx !== -1) {
-                desktopIcons.remove(idx)
+            if (idx === -1) {
+                idx = findIndexByName(filename)
             }
-            DBInterface.desktopIconEntryRemove(inode)
+            if (idx !== -1) {
+                var realInode = desktopIcons.get(idx).inode
+                desktopIcons.remove(idx)
+                DBInterface.desktopIconEntryRemove(realInode)
+            }
         }
         function onFileRenamed(inode, filename){
             console.log("FILE Renamed: ", inode)
             var idx = findIndexByInode(inode)
             if (idx !== -1) {
                 desktopIcons.setProperty(idx, "name", filename)
+                // Keep the DB name in sync so it survives a restart.
+                var e = desktopIcons.get(idx)
+                DBInterface.desktopIconEntryUpdate(e.inode, e.name, e.isDir, e.gridX, e.gridY, e.screen, e.iconName)
             }
         }
+    }
+
+    // ── Newly-added file handling ────────────────────────────────────────────
+    // inotify hands us just a filename, so we resolve type + icon in a subprocess
+    // (mirroring the boot sync) and place the file on the grid. Adds are queued
+    // and processed one at a time so concurrent creates can't race on free cells.
+    property var addQueue: []
+    property bool resolving: false
+
+    readonly property string addResolveScript: `
+        f="$1"
+        [ -e "$f" ] || exit 0
+        inode=$(stat -c %i "$f" 2>/dev/null) || exit 0
+        name=$(basename "$f")
+        if [ -d "$f" ]; then
+            echo "$inode|d|$name|folder"
+        else
+            case "$name" in
+                *.desktop)
+                    icon=$(grep -m1 '^Icon=' "$f" | cut -d= -f2-)
+                    [ -z "$icon" ] && icon="application-x-executable"
+                    echo "$inode|f|$name|$icon"
+                    ;;
+                *)
+                    icons=$(gio info -a standard::icon "$f" 2>/dev/null | grep 'standard::icon:' | sed 's/.*standard::icon: //' | tr -d ' ')
+                    [ -z "$icons" ] && icons="application-x-generic"
+                    echo "$inode|f|$name|$icons"
+                    ;;
+            esac
+        fi
+    `
+
+    Process {
+        id: addResolver
+        stdout: StdioCollector {
+            onStreamFinished: {
+                // Each resolve emits one line; take the last non-empty one so a
+                // reused collector that accumulates output can't corrupt parsing.
+                var lines = this.text.trim().split("\n")
+                var line = lines[lines.length - 1].trim()
+                if (line) {
+                    var info = line.split("|")
+                    handleResolvedAdd(info[0], info[2], info[1] === "d", info[3])
+                }
+                resolving = false
+                addRestartTimer.restart()
+            }
+        }
+    }
+
+    // Small gap so the finished process is fully torn down before we reuse it.
+    Timer {
+        id: addRestartTimer
+        interval: 10
+        repeat: false
+        onTriggered: processNextAdd()
+    }
+
+    function enqueueAdd(filename) {
+        addQueue.push(filename)
+        processNextAdd()
+    }
+
+    function processNextAdd() {
+        if (resolving || addQueue.length === 0) return
+        resolving = true
+        var filename = addQueue.shift()
+        addResolver.command = ["sh", "-c", addResolveScript, "porthole", desktopPath + "/" + filename]
+        addResolver.running = true
+    }
+
+    // Insert a resolved new file into the DB + model, placed on the first free cell.
+    function handleResolvedAdd(inode, name, isDir, iconName) {
+        if (findIndexByInode(inode) !== -1) return   // already tracked
+
+        var screenObj = Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
+        var screen = screenObj ? screenObj.name : ""
+        var maxCols = screenObj ? Math.max(1, Math.floor(screenObj.width / cellWidth)) : 10
+        var maxRows = screenObj ? Math.max(1, Math.floor(screenObj.height / cellHeight)) : 10
+
+        var cell = findFreeCell(0, 0, screen, maxCols, maxRows, inode)
+
+        DBInterface.desktopIconEntryUpdate(inode, name, isDir, cell.col, cell.row, screen, iconName)
+
+        desktopIcons.append({
+            inode: inode,
+            name: name,
+            isDir: isDir,
+            gridX: cell.col,
+            gridY: cell.row,
+            screen: screen,
+            iconName: iconName
+        })
     }
 
     // Walks ~/Desktop and, per entry, resolves an icon-name candidate list:
@@ -79,14 +183,20 @@ Singleton {
                 var folderEntries = this.text.split("\n")
                 var defaultScreen = Quickshell.screens.length > 0 ? Quickshell.screens[0].name : ""
 
+                var liveInodes = []
                 for(const entry of folderEntries) {
                     if(entry){
                         var info = entry.split("|")
+                        liveInodes.push(info[0])
                         // -1/-1 marks "not yet placed on the grid". refreshDesktopFromDB()
                         // assigns these a real cell the first time they're loaded.
                         DBInterface.desktopIconEntryDBSync(info[0], info[2], (info[1] == "d"), -1, -1, defaultScreen, info[3])
                     }
                 }
+
+                // Drop DB rows for files that no longer exist on disk (deleted
+                // while the shell was closed, or leftover from old buggy deletes).
+                DBInterface.desktopIconEntryKeepOnly(liveInodes)
 
                 refreshDesktopFromDB()
             }
@@ -95,6 +205,9 @@ Singleton {
 
     function refreshDesktopFromDB() {
         var entries = DBInterface.desktopIconEntryGetAll()
+
+        // Rebuild from scratch so this is safe to call more than once.
+        desktopIcons.clear()
 
         if (!entries) return
 
@@ -146,7 +259,11 @@ Singleton {
             desktopIcons.append({
                 inode: entry.inode,
                 name: entry.name,
-                isDir: entry.isDir,
+                // SQLite hands isDir back as a Number (0/1); coerce to a real
+                // Bool so the ListModel role type matches the Bool that
+                // handleResolvedAdd appends. Mixing the two makes QML reject the
+                // assignment and silently drop the value (breaking activateIcon).
+                isDir: (entry.isDir == 1),
                 gridX: gridX,
                 gridY: gridY,
                 screen: screen,
@@ -158,6 +275,13 @@ Singleton {
     function findIndexByInode(inode) {
         for (var i = 0; i < desktopIcons.count; i++) {
             if (String(desktopIcons.get(i).inode) === String(inode)) return i
+        }
+        return -1
+    }
+
+    function findIndexByName(name) {
+        for (var i = 0; i < desktopIcons.count; i++) {
+            if (desktopIcons.get(i).name === name) return i
         }
         return -1
     }
