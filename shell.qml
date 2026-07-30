@@ -1,5 +1,6 @@
 import Quickshell
 import Quickshell.Hyprland
+import "modules/wallpaper"
 import "modules/bar"
 import "modules/applauncher"
 import "modules/desktopgrid"
@@ -12,6 +13,7 @@ ShellRoot{
           appMenu.visible = !appMenu.visible
       }
   }
+  Wallpaper {}
   DesktopGrid{
     barHeight: taskbar.barHeight
   }
