@@ -76,7 +76,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        color: mouse.hovered ? Themes.primaryHoverColor  : "transparent"
+        color: mouse.hovered ? Themes.barHoverColor  : "transparent"
         radius: 5
 
         HoverHandler {

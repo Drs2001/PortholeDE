@@ -20,7 +20,7 @@ Button {
     }
 
     background: Rectangle{
-        color: button.hovered ? Themes.primaryHoverColor  : "transparent"
+        color: button.hovered ? Themes.barHoverColor  : "transparent"
         radius: 6
     }
 

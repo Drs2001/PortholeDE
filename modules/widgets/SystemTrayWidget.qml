@@ -26,7 +26,7 @@ Button {
     }
 
     background: Rectangle {
-        color: sysTrayButton.hovered ? Themes.primaryHoverColor : "transparent"
+        color: sysTrayButton.hovered ? Themes.barHoverColor : "transparent"
         radius: 6
     }
 

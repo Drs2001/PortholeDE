@@ -13,7 +13,7 @@ Button{
 
   background: Rectangle{
     anchors.fill: parent
-    color: updateButton.hovered ? Themes.primaryHoverColor : "transparent"
+    color: updateButton.hovered ? Themes.barHoverColor : "transparent"
     radius: 6
   }
   contentItem: Text{

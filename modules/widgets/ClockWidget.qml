@@ -12,7 +12,7 @@ Button{
   implicitHeight: parent.height
 
   background: Rectangle {
-    color: clockButton.hovered ? Themes.primaryHoverColor : "transparent"
+    color: clockButton.hovered ? Themes.barHoverColor : "transparent"
     radius: 5
   }
 

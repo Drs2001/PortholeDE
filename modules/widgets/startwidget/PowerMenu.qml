@@ -70,9 +70,11 @@ Popup {
         }
 
         PowerRow {
-            glyph: "󰖔"   // mdi weather-night (moon)
-            label: "Sleep"
-            onClicked: Quickshell.execDetached({ command: ["systemctl", "suspend"] })
+            glyph: "󰗽"   // mdi logout
+            label: "Log out"
+            // Session is UWSM-managed (wayland-wm@hyprland.desktop.service), so
+            // this cleanly stops the session and returns to regreet.
+            onClicked: Quickshell.execDetached({ command: ["uwsm", "stop"] })
         }
         PowerRow {
             glyph: "󰐥"   // mdi power

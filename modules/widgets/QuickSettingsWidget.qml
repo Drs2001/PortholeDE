@@ -31,7 +31,7 @@ Button {
     }
 
     background: Rectangle {
-        color: root.hovered ? Themes.primaryHoverColor : "transparent"
+        color: root.hovered ? Themes.barHoverColor : "transparent"
         radius: 6
     }
 

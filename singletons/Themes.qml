@@ -21,6 +21,17 @@ Singleton {
 
     property color popupBackgroundColor: activePalette.base
 
+    // Bar background. Kept semi-transparent so a compositor glass/blur effect
+    // (e.g. HyprGlass on the "porthole-bar" layer namespace) has something to
+    // refract through. Set barOpacity to 1.0 for a fully solid bar.
+    property real barOpacity: 0.55
+    property color barColor: Qt.rgba(primaryColor.r, primaryColor.g, primaryColor.b, barOpacity)
+
+    // Hover fill for bar widgets. A translucent light overlay (derived from the
+    // text color, so it adapts to light/dark) reads as part of the glass, unlike
+    // a solid highlight which looks pasted on. Tune the alpha to taste.
+    property color barHoverColor: Qt.rgba(textColor.r, textColor.g, textColor.b, 0.10)
+
     // Subtle text-derived overlays (adapt to light/dark palettes) for Windows 11
     // style hover fills, input backgrounds and divider lines.
     property color hoverOverlay: Qt.rgba(textColor.r, textColor.g, textColor.b, 0.09)
