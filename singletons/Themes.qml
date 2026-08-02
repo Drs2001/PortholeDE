@@ -21,11 +21,23 @@ Singleton {
 
     property color popupBackgroundColor: activePalette.base
 
-    // Bar background. Kept semi-transparent so a compositor glass/blur effect
-    // (e.g. HyprGlass on the "porthole-bar" layer namespace) has something to
-    // refract through. Set barOpacity to 1.0 for a fully solid bar.
+    // Master switch for the "liquid glass" look (bar + popups). A future UI toggle
+    // can just flip this — false makes every glass surface fully solid again.
+    property bool glassEnabled: true
+
+    // Bar background. Semi-transparent (when glass is on) so a compositor
+    // glass/blur effect (e.g. HyprGlass on the "porthole-bar" namespace) has
+    // something to refract through.
     property real barOpacity: 0.55
-    property color barColor: Qt.rgba(primaryColor.r, primaryColor.g, primaryColor.b, barOpacity)
+    property color barColor: glassEnabled
+        ? Qt.rgba(primaryColor.r, primaryColor.g, primaryColor.b, barOpacity)
+        : primaryColor
+
+    // Popup/flyout background. Translucent glass when enabled, solid otherwise.
+    property real popupGlassOpacity: 0.62
+    property color popupGlassColor: glassEnabled
+        ? Qt.rgba(popupBackgroundColor.r, popupBackgroundColor.g, popupBackgroundColor.b, popupGlassOpacity)
+        : popupBackgroundColor
 
     // Hover fill for bar widgets. A translucent light overlay (derived from the
     // text color, so it adapts to light/dark) reads as part of the glass, unlike
@@ -39,6 +51,11 @@ Singleton {
     property color subtleOverlay: Qt.rgba(textColor.r, textColor.g, textColor.b, 0.05)
     property color dividerColor: Qt.rgba(textColor.r, textColor.g, textColor.b, 0.12)
     property color mutedTextColor: Qt.rgba(textColor.r, textColor.g, textColor.b, 0.6)
+
+    // Windows 11 quick-settings tiles: translucent fill when OFF (reads on glass),
+    // accent fill when ON (see accentColor/accentHover).
+    property color tileInactiveColor: Qt.rgba(textColor.r, textColor.g, textColor.b, 0.08)
+    property color tileInactiveHoverColor: Qt.rgba(textColor.r, textColor.g, textColor.b, 0.15)
 
     // Utility menu pallet
     property color utilButtonDisabled: disabledPalette.accent

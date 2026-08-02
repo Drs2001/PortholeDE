@@ -201,6 +201,7 @@ Item {
                     Layout.alignment: Qt.AlignVCenter
 
                     contentItem: Text {
+                        font.family: Themes.textFont
                         text: "⏻"
                         color: Themes.textColor
                         horizontalAlignment: Text.AlignHCenter

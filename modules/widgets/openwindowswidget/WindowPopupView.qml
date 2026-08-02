@@ -82,6 +82,7 @@ PopupWindow {
 
                         RowLayout{
                             Text{
+                                font.family: Themes.textFont
                                 text: window ? window.title : ""
                                 color: Themes.textColor
                                 font.pixelSize: 12

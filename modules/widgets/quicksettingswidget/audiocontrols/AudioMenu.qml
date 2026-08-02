@@ -32,7 +32,7 @@ Item {
                 }
 
                 background: Rectangle{
-                    color: backButton.hovered ? Themes.primaryHoverColor : "transparent"
+                    color: backButton.hovered ? Themes.hoverOverlay : "transparent"
                     border.color: backButton.hovered ? Themes.primaryHoverShadow : "transparent"
                     radius: 6
                 }
@@ -43,6 +43,7 @@ Item {
                 }
             }
             Text{
+                font.family: Themes.textFont
                 text: "Sound Output"
                 color: Themes.textColor
                 font.pixelSize: 14
@@ -66,6 +67,7 @@ Item {
                 spacing: 8
 
                 Text {
+                    font.family: Themes.textFont
                     text: "Output Devices"
                     color: Themes.textColor
                     font.bold: true
@@ -80,6 +82,7 @@ Item {
                         text: modelData.description
 
                         contentItem: Text {
+                            font.family: Themes.textFont
                             text: modelData.description
                             color: Themes.textColor
                             horizontalAlignment: Text.AlignLeft
@@ -87,7 +90,7 @@ Item {
                         }
 
                         background: Rectangle{
-                            color: ((modelData.id == AudioManager.sink.id) || sinkButton.hovered) ? Themes.primaryHoverColor : "transparent"
+                            color: ((modelData.id == AudioManager.sink.id) || sinkButton.hovered) ? Themes.hoverOverlay : "transparent"
                             radius: 8
                         }
 
@@ -97,6 +100,7 @@ Item {
                     }
                 }
                 Text {
+                    font.family: Themes.textFont
                     text: "Volume Mixer"
                     color: Themes.textColor
                     font.bold: true
@@ -113,7 +117,7 @@ Item {
                             Layout.preferredWidth: 32
                             Layout.preferredHeight: 32
                             background: Rectangle{
-                                color: applicationToggle.hovered ? Themes.primaryHoverColor : "transparent"
+                                color: applicationToggle.hovered ? Themes.hoverOverlay : "transparent"
                                 radius: 5
                             }
                             contentItem: Item {
@@ -126,6 +130,7 @@ Item {
                                     source: Quickshell.iconPath(modelData.properties["application.icon-name"] || "application-menu", true)
                                 }
                                 Text {
+                                    font.family: Themes.textFont
                                     anchors.bottom: parent.bottom
                                     anchors.right: parent.right
                                     text: "X"
@@ -190,6 +195,7 @@ Item {
                                     }
 
                                     contentItem: Text {
+                                        font.family: Themes.textFont
                                         horizontalAlignment: Text.AlignHCenter
                                         text: Math.round(modelData.audio.volume * 100)
                                         color: Themes.textColor

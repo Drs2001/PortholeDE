@@ -119,6 +119,7 @@ PanelWindow {
                                 implicitSize: 24
                             }
                             Text{
+                                font.family: Themes.textFont
                                 text: modelData.name
                                 color: Themes.textColor
                             }

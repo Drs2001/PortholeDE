@@ -17,7 +17,7 @@ Button {
     }
 
     background: Rectangle{
-        color: openAudioMenu.hovered ? Themes.primaryHoverColor : "transparent"
+        color: openAudioMenu.hovered ? Themes.hoverOverlay : "transparent"
         radius: 6
     }
 

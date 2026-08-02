@@ -189,6 +189,7 @@ Variants {
                             source: modelData.iconPath
                         }
                         Text {
+                            font.family: Themes.textFont
                             width: parent.width
                             horizontalAlignment: Text.AlignHCenter
                             elide: Text.ElideRight

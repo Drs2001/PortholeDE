@@ -62,6 +62,7 @@ Rectangle {
         }
 
         Text {
+            font.family: Themes.textFont
             id: label
             width: parent.width
             clip: true

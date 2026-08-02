@@ -33,7 +33,7 @@ ColumnLayout{
                     return nightLightToggle.hovered ? Themes.accentHover : Themes.accentColor
                 }
                 else {
-                    return nightLightToggle.hovered ? Themes.primaryHoverColor : Themes.utilButtonDisabled
+                    return nightLightToggle.hovered ? Themes.tileInactiveHoverColor : Themes.tileInactiveColor
                 }
             }
         }
@@ -53,6 +53,7 @@ ColumnLayout{
     }
 
     Text {
+        font.family: Themes.textFont
         Layout.fillWidth: true
         horizontalAlignment: Text.AlignHCenter
         text: "Night Light"

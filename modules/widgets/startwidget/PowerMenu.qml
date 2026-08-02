@@ -51,6 +51,7 @@ Popup {
                     spacing: 14
 
                     Text {
+                        font.family: Themes.textFont
                         text: rowButton.glyph
                         color: Themes.textColor
                         font.pixelSize: 16
