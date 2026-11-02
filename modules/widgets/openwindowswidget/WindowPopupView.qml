@@ -70,6 +70,56 @@ PopupWindow {
                     property var window: Hyprland.toplevels.values.find(w => w.address == modelData)
                     property var padding: 15
                     property var isHovered: false
+
+                    // Set when we've asked hyprland to pull this window out of the minimized special
+                    // workspace. We only activate once hyprland reports the move as done, otherwise
+                    // activating a window that's still on a hidden special workspace makes hyprland
+                    // open that special workspace on the current monitor (and bind it there).
+                    property bool pendingActivate: false
+                    property var currentWorkspace: window ? window.workspace : null
+
+                    function isOnMinimizedWorkspace() {
+                        return currentWorkspace !== null && currentWorkspace !== undefined
+                            && currentWorkspace.name === "special:minimized"
+                    }
+
+                    function tryPendingActivate() {
+                        if (pendingActivate && window && window.wayland && !isOnMinimizedWorkspace()) {
+                            pendingActivate = false
+                            activateFallback.stop()
+                            window.wayland.activate()
+                        }
+                    }
+
+                    onCurrentWorkspaceChanged: tryPendingActivate()
+
+                    Connections {
+                        target: delegateRoot.currentWorkspace
+                        ignoreUnknownSignals: true
+                        function onNameChanged() { delegateRoot.tryPendingActivate() }
+                    }
+
+                    // Safety net in case the workspace update event is missed; never activates
+                    // while the window is still on the special workspace.
+                    Timer {
+                        id: activateFallback
+                        interval: 300
+                        onTriggered: {
+                            delegateRoot.tryPendingActivate()
+                            delegateRoot.pendingActivate = false
+                        }
+                    }
+
+                    // Quickshell permanently ends a live screencopy if hyprland fails a frame (e.g. while
+                    // the window moves to/from a hidden special workspace). Recreate the preview whenever
+                    // the window changes workspace so the capture restarts instead of staying blank.
+                    property bool captureEnabled: true
+                    property string workspaceName: currentWorkspace ? currentWorkspace.name : ""
+                    onWorkspaceNameChanged: {
+                        captureEnabled = false
+                        Qt.callLater(() => delegateRoot.captureEnabled = true)
+                    }
+
                     implicitWidth: columnLayout.implicitWidth + padding
                     implicitHeight: columnLayout.implicitHeight + padding
                     radius: 12
@@ -122,7 +172,8 @@ PopupWindow {
                         }
                         Loader {
                             id: screenCopyLoader
-                            active: (window !== undefined) && window.wayland
+                            // Only capture while the popup is showing; this also gives every open a fresh capture
+                            active: mainPopup.visible && delegateRoot.captureEnabled && (window !== undefined) && !!window.wayland
                             sourceComponent: WindowPreview {
                                 waylandWindow: window.wayland
                             }
@@ -135,7 +186,8 @@ PopupWindow {
                         z: -1
                         
                         onClicked: {
-                            if(window.workspace.id == -98){
+                            if(!window) return
+                            if(delegateRoot.isOnMinimizedWorkspace()){
                                  var workspaceId = Hyprland.focusedWorkspace.id
 
                                 // We fullscreen temporarily here to fix a weird bug with hyprland where swapping workspaces while another window is fullscreend cause the sub window to turn invisible
@@ -147,8 +199,14 @@ PopupWindow {
                                 //*****************************************************************************/
 
                                 var dispatchStr = "hl.dsp.window.move({ workspace = " + workspaceId + ", follow = false, window = 'address:0x" + window.address + "' })"
+                                // Dispatch is async: don't activate here, wait for hyprland to report the move
+                                delegateRoot.pendingActivate = true
+                                activateFallback.restart()
+                                // Close right away; otherwise the preview gets rebuilt on the workspace change
+                                // and the popup sits there blank until the hover timers close it
+                                hideTimer.stop()
+                                mainPopup.visible = false
                                 Hyprland.dispatch(dispatchStr)
-                                window.wayland.activate()
                             }
                             else{
                                 // Wont move mouse cursor and focus if window is already focused by hyprland
