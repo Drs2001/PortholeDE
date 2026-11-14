@@ -51,7 +51,7 @@ PanelWindow {
 
                 IconImage {
                     implicitSize: 22
-                    source: Quickshell.iconPath(modelData.icon, "application-default-icon")
+                    source: IconResolver.notificationIcon(modelData.icon, modelData.desktopEntry, modelData.appName)
                 }
                 Text {
                     text: modelData.appName

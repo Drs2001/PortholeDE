@@ -13,7 +13,8 @@ Button {
     implicitHeight: windowScroller.height
 
     contentItem: Image{
-        source: windowInfo.iconPath
+        // windowInfo can be briefly undefined while the window list is rebuilt
+        source: windowInfo ? windowInfo.iconPath : ""
         sourceSize.width: button.width
         sourceSize.height: button.height
         fillMode: Image.PreserveAspectFit
@@ -38,7 +39,7 @@ Button {
         interval: 200
         onTriggered: {
             hideTimer.stop()
-            windowPopup.show(button, windowInfo.addresses)
+            if (windowInfo) windowPopup.show(button, windowInfo.addresses)
         }
     }
 

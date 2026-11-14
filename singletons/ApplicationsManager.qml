@@ -1,5 +1,6 @@
 pragma Singleton
 
+import QtQml
 import QtQuick
 import Quickshell
 import Quickshell.Hyprland
@@ -11,12 +12,16 @@ Singleton {
     property var entries: []
     property var openWindows: ({})
     property var windowKeys: []
-    
+
+    // Window addresses we've already asked Hyprland for client info (pid) about,
+    // so a window that never reports a pid can't cause a refresh loop.
+    property var pidRequested: ({})
+
     Component.onCompleted: {
         updateEntries()
         updateOpenWindows()
     }
-    
+
     // Update desktop entries list when changed
     Connections {
         target: DesktopEntries.applications
@@ -33,9 +38,41 @@ Singleton {
         }
     }
 
+    // Re-resolve window icons when the resolver learns something new: desktop
+    // entries finished loading (they're empty at startup) or a pid hint arrived.
+    Connections {
+        target: IconResolver
+        function onRevisionChanged() {
+            updateTimer.restart()
+        }
+    }
+
+    // Some apps (notably Electron ones) map their window before setting their
+    // app id, or change it later. Regroup / re-resolve when that happens.
+    Instantiator {
+        model: ToplevelManager.toplevels
+        delegate: Connections {
+            required property var modelData
+            target: modelData
+            function onAppIdChanged() {
+                updateTimer.restart()
+            }
+        }
+    }
+
     Timer {
         id: updateTimer
         interval: 100
+        onTriggered: {
+            updateOpenWindows()
+        }
+    }
+
+    // Hyprland's client info (which carries the pid) is fetched on request;
+    // give it a moment to arrive, then resolve again with pids available.
+    Timer {
+        id: pidRetryTimer
+        interval: 300
         onTriggered: {
             updateOpenWindows()
         }
@@ -66,98 +103,54 @@ Singleton {
     }
 
     // Updates the global dictionary with information about the open Hyprland windows and their associated applications
-    function updateOpenWindows(){  
-        var currentAppIds = new Set()
-
-        // Refresh addresses
-        Object.keys(openWindows).forEach(appId => {
-            openWindows[appId].addresses = []
-        })
+    // Rebuilt from scratch every time and reassigned (not mutated in place) so
+    // bindings like `openWindows[key]` in the taskbar actually update. Icons are
+    // re-resolved every pass too: they can change once desktop entries load,
+    // a window's app id changes, or its process identity is known.
+    function updateOpenWindows(){
+        var windows = {}
+        var livePids = []
+        var needPids = false
+        var requested = Object.assign({}, pidRequested)
 
         Hyprland.toplevels.values.filter(w => w.wayland).forEach(w => {
-            var appId = w.wayland.appId
-            var application = DesktopEntries.heuristicLookup(appId)
-            currentAppIds.add(appId)
+            var appId = String(w.wayland.appId || "")
+            var pid = w.lastIpcObject && w.lastIpcObject.pid ? String(w.lastIpcObject.pid) : ""
 
-            // Check if we found something with the heuristic look up and if not check if its  chrome webapp
-            if(!application){
-                if(appId.includes("chrome")){
-                    application = DesktopEntries.heuristicLookup("chromium")
-                }
+            if (pid) {
+                livePids.push(pid)
+            } else if (!requested[w.address]) {
+                requested[w.address] = true
+                needPids = true
             }
-            
-            // We attempt to get the icon path here as not all appIds corrospond to applicaitons, so we want to make sure some icon is displayed
-            var iconPath = getIcon(appId, application)
 
-            if(!openWindows[appId]){
-                openWindows[appId] = {
-                    id: String(appId), // The wayland app id of the window
+            if (!windows[appId]) {
+                windows[appId] = {
+                    id: appId, // The wayland app id of the window
                     addresses: [],
-                    iconPath: String(iconPath) // The icon path for the window
+                    iconPath: IconResolver.iconForApp(appId, pid)
                 }
-
-                openWindows[appId].addresses.push(w.address)
             }
-            else {
-                openWindows[appId].addresses.push(w.address)
-            }
+            windows[appId].addresses.push(w.address)
         })
 
-        // Remove appIds that are no longer in toplevels
-        Object.keys(openWindows).forEach(appId => {
-            if(!currentAppIds.has(appId)) {
-                delete openWindows[appId]
-            }
-        })
-
-        windowKeys = Object.keys(openWindows)
-    }
-
-    function getIcon(appId, application) {
-        var iconPath = ""
-        if(application){
-            iconPath = Quickshell.iconPath(application.icon, true)
+        // Forget bookkeeping for windows / processes that are gone.
+        var liveAddresses = Hyprland.toplevels.values.map(w => w.address)
+        for (var addr in requested) {
+            if (liveAddresses.indexOf(addr) === -1) delete requested[addr]
         }
-        else {
-            iconPath = Quickshell.iconPath(appId, true)
+        pidRequested = requested
+        IconResolver.prunePids(livePids)
+
+        openWindows = windows
+        // Only reassign the key list when it actually changed, otherwise the
+        // taskbar ListView would rebuild every button on each re-resolve.
+        var keys = Object.keys(windows)
+        if (keys.join("\n") !== windowKeys.join("\n")) windowKeys = keys
+
+        if (needPids) {
+            Hyprland.refreshToplevels()
+            pidRetryTimer.restart()
         }
-
-        if(iconPath == ""){
-            if(appId.includes("steam")){
-                iconPath = Quickshell.iconPath(appId.replace("app", "icon"), true)
-            }
-            
-            if(iconPath == ""){
-                iconPath = Quickshell.iconPath(findIconFallback(appId), true)
-            }
-
-            if(iconPath == ""){
-                iconPath = Quickshell.iconPath("application-default-icon", true)
-            }
-        }
-
-        return iconPath
-    }
-
-    function findIconFallback(appId){
-        // 2. Convert to lowercase for case-insensitive matching
-        let searchId = appId.toLowerCase();
-        
-        // 3. Remove version numbers and common suffixes
-        // Match patterns like "1.21.1", "v2.0", etc.
-        searchId = searchId.replace(/[_\s-]*(v?\d+\.)*\d+(\.\d+)*[_\s-]*/g, '');
-        
-        // 4. Remove common special characters and cleanup
-        searchId = searchId.replace(/[*&$@#!()[\]{}]/g, '');
-        
-        // 5. Remove common suffixes
-        searchId = searchId.replace(/[_\s-]*(beta|alpha|stable|dev|nightly|git)$/i, '');
-        
-        // 6. Split on common separators and take first significant part
-        let parts = searchId.split(/[_\s-]+/);
-        searchId = parts[0] || searchId;
-        
-        // 7. Try to find icon with this cleaned name
-        return searchId;
     }
 }

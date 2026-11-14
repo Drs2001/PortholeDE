@@ -620,7 +620,9 @@ Singleton {
         for (var i = 0; i < candidates.length; i++) {
             var name = candidates[i].trim()
             if (!name) continue
-            var p = Quickshell.iconPath(name, true)
+            // IconResolver also handles absolute paths and names with an
+            // extension, both common in Icon= lines of .desktop launchers.
+            var p = IconResolver.iconPath(name)
             if (p) return p
         }
         return fallback

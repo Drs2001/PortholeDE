@@ -115,7 +115,7 @@ PanelWindow {
                             spacing: 8
 
                             IconImage {
-                                source: Quickshell.iconPath(modelData.icon, "application-default-icon")
+                                source: IconResolver.entryIcon(modelData)
                                 implicitSize: 24
                             }
                             Text{

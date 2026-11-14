@@ -127,7 +127,7 @@ Item {
                                     width: 26
                                     anchors.centerIn: parent
                                     fillMode: Image.PreserveAspectFit
-                                    source: Quickshell.iconPath(modelData.properties["application.icon-name"] || "application-menu", true)
+                                    source: IconResolver.streamIcon(modelData.properties)
                                 }
                                 Text {
                                     font.family: Themes.textFont

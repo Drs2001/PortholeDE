@@ -26,7 +26,7 @@ Item {
                 spacing: 14
 
                 IconImage {
-                    source: Quickshell.iconPath(application.icon, "application-default-icon")
+                    source: IconResolver.entryIcon(application)
                     implicitSize: 26
                     Layout.preferredWidth: 26
                     Layout.preferredHeight: 26
