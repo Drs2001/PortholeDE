@@ -8,7 +8,6 @@ import qs.singletons
 
 Variants {
     required property int barHeight
-    property var rightClickMenuOpen: false
     model: Quickshell.screens
 
     PanelWindow {
@@ -26,6 +25,90 @@ Variants {
         // modifier state, so pointer events report modifiers == 0 and Ctrl+click
         // can't be distinguished from a plain click.
         WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+
+        // Grid cell under the last right-click on empty desktop (new and pasted
+        // files are placed there).
+        property int menuCol: 0
+        property int menuRow: 0
+        property bool desktopMenuOpen: false
+
+        function desktopMenuItems() {
+            return [
+                { text: "Refresh", icon: "view-refresh", action: "refresh" },
+                { separator: true },
+                { text: "Paste", icon: "edit-paste", action: "paste",
+                  enabled: DesktopStateManager.clipboardFiles.length > 0 },
+                { text: "New", icon: "document-new", children: [
+                    { text: "Folder", icon: "folder-new", action: "new-folder" },
+                    { text: "Document", icon: "text-x-generic", action: "new-document" }
+                ] },
+                { separator: true },
+                { text: "Open in Terminal", icon: "utilities-terminal", action: "terminal" }
+            ]
+        }
+
+        function openDesktopMenu(x, y) {
+            DesktopStateManager.clearSelection()
+            DesktopStateManager.checkClipboard()
+            menuCol = Math.floor(x / DesktopStateManager.cellWidth)
+            menuRow = Math.floor(y / DesktopStateManager.cellHeight)
+            contextMenu.openAt(x, y, desktopMenuItems())
+            desktopMenuOpen = true
+        }
+
+        // The clipboard check is async: enable "Paste" once it reports files.
+        Connections {
+            target: DesktopStateManager
+            function onClipboardFilesChanged() {
+                if (gridWindow.desktopMenuOpen && contextMenu.visible) {
+                    contextMenu.items = gridWindow.desktopMenuItems()
+                }
+            }
+        }
+
+        // Acts on the current selection (the icon that was right-clicked is
+        // added to / made the selection by DesktopIcon before this is called).
+        function openIconMenu(x, y) {
+            var count = DesktopStateManager.selectedInodes.length
+            desktopMenuOpen = false
+            contextMenu.openAt(x, y, [
+                { text: count > 1 ? "Open " + count + " Items" : "Open", icon: "document-open", action: "open" },
+                { separator: true },
+                { text: "Move to Trash", icon: "user-trash", action: "trash" }
+            ])
+        }
+
+        DesktopContextMenu {
+            id: contextMenu
+            anchor.window: gridWindow
+
+            onTriggered: action => {
+                var screenName = gridWindow.screen.name
+                switch (action) {
+                case "refresh":
+                    Quickshell.reload(false)
+                    break
+                case "paste":
+                    DesktopStateManager.pasteClipboard(screenName, gridWindow.menuCol, gridWindow.menuRow)
+                    break
+                case "new-folder":
+                    DesktopStateManager.createFolder(screenName, gridWindow.menuCol, gridWindow.menuRow)
+                    break
+                case "new-document":
+                    DesktopStateManager.createDocument(screenName, gridWindow.menuCol, gridWindow.menuRow)
+                    break
+                case "terminal":
+                    DesktopStateManager.openTerminalHere()
+                    break
+                case "open":
+                    DesktopStateManager.openSelected()
+                    break
+                case "trash":
+                    DesktopStateManager.trashSelected()
+                    break
+                }
+            }
+        }
 
         Rectangle {
             anchors.fill: parent
@@ -104,7 +187,7 @@ Variants {
 
                 onClicked: event => {
                     if (event.button === Qt.RightButton) {
-                        //TODO: Add right click menu that communicates with all windows
+                        gridWindow.openDesktopMenu(event.x, event.y)
                     }
                 }
             }
@@ -113,6 +196,7 @@ Variants {
                 model: DesktopStateManager.desktopIcons
                 delegate: DesktopIcon {
                     screenName: gridWindow.screen.name
+                    onContextMenuRequested: (x, y) => gridWindow.openIconMenu(x, y)
                 }
             }
 

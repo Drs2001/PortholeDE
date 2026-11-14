@@ -16,6 +16,9 @@ Rectangle {
     // model.xxx binding below.
     property string screenName
 
+    // Right-click; x/y are in grid-window coordinates.
+    signal contextMenuRequested(real x, real y)
+
     // Selection is tracked centrally (so Ctrl+click can build a multi-selection
     // across the whole grid); this reruns whenever that set is reassigned.
     property bool selected: DesktopStateManager.selectedInodes.indexOf(String(model.inode)) !== -1
@@ -82,16 +85,29 @@ Rectangle {
         id: mouseArea
         anchors.fill: parent
         hoverEnabled: true
-        acceptedButtons: Qt.LeftButton
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
 
         onClicked: mouse => {
+            if (mouse.button === Qt.RightButton) {
+                // Like a file manager: right-clicking inside the selection keeps
+                // it (so the menu acts on all of it), otherwise this icon
+                // becomes the selection.
+                if (!DesktopStateManager.isSelected(model.inode)) {
+                    DesktopStateManager.selectOnly(model.inode)
+                }
+                var p = rect.mapToItem(null, mouse.x, mouse.y)
+                rect.contextMenuRequested(p.x, p.y)
+                return
+            }
             if (mouse.modifiers & Qt.ControlModifier) {
                 DesktopStateManager.toggleSelection(model.inode)
             } else {
                 DesktopStateManager.selectOnly(model.inode)
             }
         }
-        onDoubleClicked: DesktopStateManager.activateIcon(model.inode)
+        onDoubleClicked: mouse => {
+            if (mouse.button === Qt.LeftButton) DesktopStateManager.activateIcon(model.inode)
+        }
     }
 
     // Native Qt DnD is used ONLY to route drag events across monitors (each grid

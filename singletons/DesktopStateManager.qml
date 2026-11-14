@@ -130,12 +130,19 @@ Singleton {
     function handleResolvedAdd(inode, name, isDir, iconName) {
         if (findIndexByInode(inode) !== -1) return   // already tracked
 
-        var screenObj = Quickshell.screens.length > 0 ? Quickshell.screens[0] : null
+        // Created from the context menu: place it where the user right-clicked.
+        var place = pendingPlacements[name]
+        if (place) delete pendingPlacements[name]
+        var placedScreen = place ? screenObjByName(place.screen) : null
+
+        var screenObj = placedScreen || (Quickshell.screens.length > 0 ? Quickshell.screens[0] : null)
         var screen = screenObj ? screenObj.name : ""
         var maxCols = screenObj ? Math.max(1, Math.floor(screenObj.width / cellWidth)) : 10
         var maxRows = screenObj ? Math.max(1, Math.floor(screenObj.height / cellHeight)) : 10
 
-        var cell = findFreeCell(0, 0, screen, maxCols, maxRows, inode)
+        var cell = placedScreen
+            ? findFreeCell(place.col, place.row, screen, maxCols, maxRows, inode)
+            : findFreeCell(0, 0, screen, maxCols, maxRows, inode)
 
         DBInterface.desktopIconEntryUpdate(inode, name, isDir, cell.col, cell.row, screen, iconName)
 
@@ -148,6 +155,7 @@ Singleton {
             screen: screen,
             iconName: iconName
         })
+        if (placedScreen) selectOnly(inode)
     }
 
     // Walks ~/Desktop and, per entry, resolves an icon-name candidate list:
@@ -644,5 +652,169 @@ Singleton {
         } else {
             Quickshell.execDetached({ command: ["xdg-open", fpath] })
         }
+    }
+
+    // ── Context menu actions ────────────────────────────────────────────────
+    // filename -> { screen, col, row }: where a file we're about to create
+    // should land once inotify reports it (see handleResolvedAdd).
+    property var pendingPlacements: ({})
+
+    function desktopNames() {
+        var taken = {}
+        for (var i = 0; i < desktopIcons.count; i++) taken[desktopIcons.get(i).name] = true
+        return taken
+    }
+
+    // "New Folder", "New Folder 2", ... (the number goes before the extension).
+    function uniqueNewName(base, ext, taken) {
+        var name = base + ext
+        for (var n = 2; taken[name]; n++) name = base + " " + n + ext
+        return name
+    }
+
+    // Creates "New Folder" (or "New Folder 2", ...) at the given cell.
+    function createFolder(screenName, col, row) {
+        var name = uniqueNewName("New Folder", "", desktopNames())
+        pendingPlacements[name] = { screen: screenName, col: col, row: row }
+        // No -p: if the name exists after all (untracked file), mkdir just fails
+        // instead of reusing it.
+        Quickshell.execDetached({ command: ["mkdir", "--", desktopPath + "/" + name] })
+    }
+
+    // Creates an empty "New Document.txt" at the given cell.
+    function createDocument(screenName, col, row) {
+        var name = uniqueNewName("New Document", ".txt", desktopNames())
+        pendingPlacements[name] = { screen: screenName, col: col, row: row }
+        // set -C (noclobber): never truncate a file that already exists.
+        Quickshell.execDetached({ command: ["sh", "-c", 'set -C; : > "$1"', "porthole", desktopPath + "/" + name] })
+    }
+
+    // ── Paste ───────────────────────────────────────────────────────────────
+    // File managers put copied files on the clipboard as file:// URIs:
+    //   x-special/gnome-copied-files  "copy"/"cut" line, then URIs (GTK apps)
+    //   text/uri-list                 URIs; KDE marks a cut with
+    //                                 application/x-kde-cutselection = "1"
+    // checkClipboard() snapshots that into clipboardFiles / clipboardCut when
+    // the menu opens; pasteClipboard() copies (or moves, for a cut) them here.
+    property var clipboardFiles: []
+    property bool clipboardCut: false
+
+    readonly property string clipboardReadScript: `
+        types=$(wl-paste --list-types 2>/dev/null) || exit 0
+        has() { printf '%s\\n' "$types" | grep -qx "$1"; }
+        if has x-special/gnome-copied-files; then
+            wl-paste -n -t x-special/gnome-copied-files
+        elif has text/uri-list; then
+            if has application/x-kde-cutselection \\
+                && [ "$(wl-paste -n -t application/x-kde-cutselection)" = 1 ]; then
+                echo cut
+            else
+                echo copy
+            fi
+            wl-paste -n -t text/uri-list
+        fi
+    `
+
+    Process {
+        id: clipboardReader
+        command: ["sh", "-c", root.clipboardReadScript]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                var lines = this.text.split("\n")
+                var files = []
+                for (var i = 1; i < lines.length; i++) {
+                    var uri = lines[i].trim()
+                    if (!uri.startsWith("file://")) continue   // also skips "#" comments
+                    // file:///path or file://host/path -> /path
+                    try {
+                        files.push(decodeURIComponent(uri.replace(/^file:\/\/[^\/]*/, "")))
+                    } catch (e) {}
+                }
+                root.clipboardCut = lines[0].trim() === "cut"
+                if (files.join("\n") !== root.clipboardFiles.join("\n")) root.clipboardFiles = files
+            }
+        }
+    }
+
+    function checkClipboard() {
+        clipboardReader.running = false
+        clipboardReader.running = true
+    }
+
+    // "photo.jpg" -> "photo (copy).jpg", "photo (copy 2).jpg", ...
+    function uniqueCopyName(name, taken) {
+        if (!taken[name]) return name
+        var dot = name.lastIndexOf(".")
+        var base = dot > 0 ? name.slice(0, dot) : name
+        var ext = dot > 0 ? name.slice(dot) : ""
+        var candidate = base + " (copy)" + ext
+        for (var n = 2; taken[candidate]; n++) candidate = base + " (copy " + n + ")" + ext
+        return candidate
+    }
+
+    readonly property string pasteScript: `
+        op="$1"; shift
+        while [ $# -ge 2 ]; do
+            if [ -e "$2" ]; then :            # never overwrite
+            elif [ "$op" = cut ]; then mv -n -- "$1" "$2"
+            else cp -a -- "$1" "$2"
+            fi
+            shift 2
+        done
+        # Like file managers: a cut is pasted once, then the clipboard is cleared.
+        [ "$op" = cut ] && wl-copy --clear
+        exit 0
+    `
+
+    // Pastes the files from the last checkClipboard() into ~/Desktop, placed
+    // around the given cell. Name clashes get a " (copy)" suffix.
+    function pasteClipboard(screenName, col, row) {
+        if (clipboardFiles.length === 0) return
+        var taken = desktopNames()
+        var args = []
+        for (var i = 0; i < clipboardFiles.length; i++) {
+            var src = clipboardFiles[i]
+            var slash = src.lastIndexOf("/")
+            var name = src.slice(slash + 1)
+            if (!name) continue
+            // Cutting from the Desktop and pasting back onto it is a no-op.
+            if (clipboardCut && src.slice(0, slash) === desktopPath) continue
+
+            var target = uniqueCopyName(name, taken)
+            taken[target] = true
+            pendingPlacements[target] = { screen: screenName, col: col, row: row }
+            args.push(src, desktopPath + "/" + target)
+        }
+        if (args.length === 0) return
+        Quickshell.execDetached({
+            command: ["sh", "-c", pasteScript, "porthole", clipboardCut ? "cut" : "copy"].concat(args)
+        })
+    }
+
+    function selectedPaths() {
+        var paths = []
+        for (var i = 0; i < selectedInodes.length; i++) {
+            var idx = findIndexByInode(selectedInodes[i])
+            if (idx !== -1) paths.push(desktopPath + "/" + desktopIcons.get(idx).name)
+        }
+        return paths
+    }
+
+    function openSelected() {
+        var inodes = selectedInodes.slice()
+        for (var i = 0; i < inodes.length; i++) activateIcon(inodes[i])
+    }
+
+    // Uses the freedesktop trash (restorable from the file manager). The watcher
+    // sees the files leave ~/Desktop and removes them from the grid.
+    function trashSelected() {
+        var paths = selectedPaths()
+        if (paths.length === 0) return
+        Quickshell.execDetached({ command: ["gio", "trash", "--"].concat(paths) })
+        clearSelection()
+    }
+
+    function openTerminalHere() {
+        Quickshell.execDetached({ command: ["kitty", "--directory", desktopPath] })
     }
 }

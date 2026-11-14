@@ -39,6 +39,7 @@ Package names are for Arch Linux (AUR packages marked).
 - `glib2` (`gio`, for file icons and launching `.desktop` files)
 - `xdg-utils` (`xdg-open`)
 - `nautilus` (opens folders)
+- `wl-clipboard` (pasting copied files onto the desktop)
 
 **Other**
 - `yay` (AUR update count)
