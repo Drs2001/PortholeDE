@@ -814,6 +814,153 @@ Singleton {
         clearSelection()
     }
 
+    // ── Icon menu ───────────────────────────────────────────────────────────
+
+    // "Open With": the apps registered for the file's MIME type (what file
+    // managers list), default app first. Loaded async when the menu opens.
+    property string openWithPath: ""
+    property var openWithApps: []      // [{ id, name, icon }]
+    property bool openWithLoaded: false
+
+    readonly property string openWithScript: `
+        t=$(gio info -a standard::content-type -- "$1" 2>/dev/null | sed -n 's/.*standard::content-type: //p')
+        [ -n "$t" ] || exit 0
+        LC_ALL=C gio mime "$t" 2>/dev/null | sed -n \\
+            -e 's/^Default application for .*: /default|/p' \\
+            -e 's/^[[:space:]][[:space:]]*/app|/p'
+    `
+
+    Process {
+        id: openWithProc
+        property string forPath: ""
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (openWithProc.forPath !== root.openWithPath) return   // stale
+                var defaultId = ""
+                var ids = []
+                var lines = this.text.split("\n")
+                for (var i = 0; i < lines.length; i++) {
+                    var sep = lines[i].indexOf("|")
+                    if (sep === -1) continue
+                    var id = lines[i].slice(sep + 1).trim()
+                    if (lines[i].slice(0, sep) === "default") defaultId = id
+                    else ids.push(id)
+                }
+                if (defaultId) ids.unshift(defaultId)
+
+                var apps = []
+                var seen = {}
+                for (var j = 0; j < ids.length; j++) {
+                    var entry = IconResolver.byIdLoose(ids[j])
+                    if (!entry || seen[entry.id]) continue
+                    seen[entry.id] = true
+                    apps.push({ id: entry.id, name: entry.name, icon: entry.icon })
+                }
+                root.openWithApps = apps
+                root.openWithLoaded = true
+            }
+        }
+    }
+
+    function loadOpenWith(inode) {
+        var idx = findIndexByInode(inode)
+        if (idx === -1) return
+        openWithPath = desktopPath + "/" + desktopIcons.get(idx).name
+        openWithApps = []
+        openWithLoaded = false
+        openWithProc.running = false
+        openWithProc.forPath = openWithPath
+        openWithProc.command = ["sh", "-c", openWithScript, "porthole", openWithPath]
+        openWithProc.running = true
+    }
+
+    function openWith(appId) {
+        if (!openWithPath || !appId) return
+        Quickshell.execDetached({ command: ["gtk-launch", appId, openWithPath] })
+    }
+
+    // "Cut" / "Copy": the format GTK file managers (Nautilus, Nemo, Thunar)
+    // use, which our own Paste reads too.
+    function copySelected(cut) {
+        var paths = selectedPaths()
+        if (paths.length === 0) return
+        var uris = paths.map(p => "file://" + p.split("/").map(encodeURIComponent).join("/"))
+        var data = (cut ? "cut" : "copy") + "\n" + uris.join("\n")
+        Quickshell.execDetached({
+            command: ["sh", "-c", 'printf "%s" "$1" | wl-copy -t x-special/gnome-copied-files', "porthole", data]
+        })
+    }
+
+    // "Send To > Compressed (zipped) folder": zips the selection into
+    // "<name>.zip" next to `nearInode` (the icon that was right-clicked).
+    function compressSelected(nearInode) {
+        var names = []
+        for (var i = 0; i < selectedInodes.length; i++) {
+            var idx = findIndexByInode(selectedInodes[i])
+            if (idx !== -1) names.push(desktopIcons.get(idx).name)
+        }
+        if (names.length === 0) return
+
+        var nearIdx = findIndexByInode(nearInode)
+        var near = nearIdx !== -1 ? desktopIcons.get(nearIdx) : desktopIcons.get(findIndexByInode(selectedInodes[0]))
+        var base = String(near.name)
+        var dot = base.lastIndexOf(".")
+        if (!near.isDir && dot > 0) base = base.slice(0, dot)
+
+        var zip = uniqueNewName(base, ".zip", desktopNames())
+        pendingPlacements[zip] = { screen: near.screen, col: near.gridX, row: near.gridY }
+        // bsdtar (libarchive) ships with pacman; -a picks zip from the suffix.
+        Quickshell.execDetached({
+            command: ["sh", "-c", 'd="$1"; out="$2"; shift 2; cd "$d" && bsdtar -a -cf "$out" -- "$@"',
+                      "porthole", desktopPath, zip].concat(names)
+        })
+    }
+
+    // "Rename": edited in place on the icon (see DesktopIcon). The watcher
+    // picks up the rename and updates the model.
+    property string renamingInode: ""
+    property string renamingScreen: ""
+    property string renameDraft: ""
+
+    function beginRename(inode) {
+        var idx = findIndexByInode(inode)
+        if (idx === -1) return
+        var e = desktopIcons.get(idx)
+        renameDraft = e.name
+        renamingScreen = e.screen
+        selectOnly(inode)
+        renamingInode = String(inode)
+    }
+
+    function cancelRename() {
+        renamingInode = ""
+    }
+
+    // Why `name` can't be used ("" if it can).
+    function renameError(name) {
+        var n = String(name).trim()
+        var idx = findIndexByInode(renamingInode)
+        var current = idx !== -1 ? desktopIcons.get(idx).name : ""
+        if (!n) return "Name can't be empty"
+        if (n.indexOf("/") !== -1) return "Name can't contain \"/\""
+        if (n === "." || n === "..") return "Invalid name"
+        if (n !== current && desktopNames()[n]) return "A file with that name already exists"
+        return ""
+    }
+
+    // Applies the draft; an invalid or unchanged name just ends editing.
+    function commitRename() {
+        if (!renamingInode) return
+        var idx = findIndexByInode(renamingInode)
+        var newName = renameDraft.trim()
+        var ok = idx !== -1 && !renameError(newName)
+        renamingInode = ""
+        if (!ok) return
+        var oldName = desktopIcons.get(idx).name
+        if (newName === oldName) return
+        Quickshell.execDetached({ command: ["mv", "-n", "--", desktopPath + "/" + oldName, desktopPath + "/" + newName] })
+    }
+
     function openTerminalHere() {
         Quickshell.execDetached({ command: ["kitty", "--directory", desktopPath] })
     }

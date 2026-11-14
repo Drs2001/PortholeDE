@@ -30,7 +30,11 @@ Variants {
         // files are placed there).
         property int menuCol: 0
         property int menuRow: 0
-        property bool desktopMenuOpen: false
+        // Which menu is open ("desktop" / "icon"), so async results (clipboard,
+        // Open With apps) refresh the right one.
+        property string menuKind: ""
+        // Icon that was right-clicked (the selection may contain more).
+        property string menuInode: ""
 
         function desktopMenuItems() {
             return [
@@ -52,30 +56,63 @@ Variants {
             DesktopStateManager.checkClipboard()
             menuCol = Math.floor(x / DesktopStateManager.cellWidth)
             menuRow = Math.floor(y / DesktopStateManager.cellHeight)
+            menuKind = "desktop"
             contextMenu.openAt(x, y, desktopMenuItems())
-            desktopMenuOpen = true
         }
 
-        // The clipboard check is async: enable "Paste" once it reports files.
+        function openWithItems() {
+            if (!DesktopStateManager.openWithLoaded) return [{ text: "Loading…", enabled: false }]
+            var apps = DesktopStateManager.openWithApps
+            if (apps.length === 0) return [{ text: "No applications found", enabled: false }]
+            return apps.map(a => ({ text: a.name, icon: a.icon, action: "open-with:" + a.id }))
+        }
+
+        // Acts on the current selection (DesktopIcon adds the right-clicked
+        // icon to / makes it the selection before calling this). Open With and
+        // Rename only make sense for a single item.
+        function iconMenuItems() {
+            var count = DesktopStateManager.selectedInodes.length
+            var single = count === 1
+            var items = [
+                { text: single ? "Open" : "Open " + count + " Items", icon: "document-open", action: "open" }
+            ]
+            if (single) items.push({ text: "Open With", icon: "system-run", children: openWithItems() })
+            items.push(
+                { separator: true },
+                { text: "Send To", icon: "document-send", children: [
+                    { text: "Compressed (zipped) folder", icon: "package-x-generic", action: "zip" }
+                ] },
+                { separator: true },
+                { text: "Cut", icon: "edit-cut", action: "cut" },
+                { text: "Copy", icon: "edit-copy", action: "copy" },
+                { separator: true },
+                { text: "Delete", icon: "edit-delete", action: "trash" },
+                { text: "Rename", icon: "edit-rename", action: "rename", enabled: single }
+            )
+            return items
+        }
+
+        function openIconMenu(x, y, inode) {
+            menuInode = inode
+            menuKind = "icon"
+            if (DesktopStateManager.selectedInodes.length === 1) DesktopStateManager.loadOpenWith(inode)
+            contextMenu.openAt(x, y, iconMenuItems())
+        }
+
+        // Clipboard check / Open With lookup are async: refresh the open menu
+        // when their results arrive.
         Connections {
             target: DesktopStateManager
             function onClipboardFilesChanged() {
-                if (gridWindow.desktopMenuOpen && contextMenu.visible) {
+                if (gridWindow.menuKind === "desktop" && contextMenu.visible) {
                     contextMenu.items = gridWindow.desktopMenuItems()
                 }
             }
-        }
-
-        // Acts on the current selection (the icon that was right-clicked is
-        // added to / made the selection by DesktopIcon before this is called).
-        function openIconMenu(x, y) {
-            var count = DesktopStateManager.selectedInodes.length
-            desktopMenuOpen = false
-            contextMenu.openAt(x, y, [
-                { text: count > 1 ? "Open " + count + " Items" : "Open", icon: "document-open", action: "open" },
-                { separator: true },
-                { text: "Move to Trash", icon: "user-trash", action: "trash" }
-            ])
+            function onOpenWithLoadedChanged() {
+                if (gridWindow.menuKind === "icon" && contextMenu.visible) {
+                    contextMenu.items = gridWindow.iconMenuItems()
+                }
+            }
         }
 
         DesktopContextMenu {
@@ -84,7 +121,12 @@ Variants {
 
             onTriggered: action => {
                 var screenName = gridWindow.screen.name
+                if (action.startsWith("open-with:")) {
+                    DesktopStateManager.openWith(action.slice("open-with:".length))
+                    return
+                }
                 switch (action) {
+                // Desktop menu
                 case "refresh":
                     Quickshell.reload(false)
                     break
@@ -100,11 +142,24 @@ Variants {
                 case "terminal":
                     DesktopStateManager.openTerminalHere()
                     break
+                // Icon menu
                 case "open":
                     DesktopStateManager.openSelected()
                     break
+                case "zip":
+                    DesktopStateManager.compressSelected(gridWindow.menuInode)
+                    break
+                case "cut":
+                    DesktopStateManager.copySelected(true)
+                    break
+                case "copy":
+                    DesktopStateManager.copySelected(false)
+                    break
                 case "trash":
                     DesktopStateManager.trashSelected()
+                    break
+                case "rename":
+                    DesktopStateManager.beginRename(gridWindow.menuInode)
                     break
                 }
             }
@@ -166,6 +221,8 @@ Variants {
                 readonly property real originY: gridWindow.screen.y
 
                 onPressed: mouse => {
+                    // Clicking empty desktop finishes a rename in progress.
+                    if (DesktopStateManager.renamingInode) DesktopStateManager.commitRename()
                     if (mouse.button === Qt.LeftButton) {
                         // Ctrl keeps the existing selection and adds to it.
                         var additive = (mouse.modifiers & Qt.ControlModifier)
@@ -196,7 +253,7 @@ Variants {
                 model: DesktopStateManager.desktopIcons
                 delegate: DesktopIcon {
                     screenName: gridWindow.screen.name
-                    onContextMenuRequested: (x, y) => gridWindow.openIconMenu(x, y)
+                    onContextMenuRequested: (x, y, inode) => gridWindow.openIconMenu(x, y, inode)
                 }
             }
 

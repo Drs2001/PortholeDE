@@ -64,8 +64,22 @@ PopupWindow {
         submenu.anchor.rect.y = p.y - mainList.padding
         submenu.anchor.rect.width = entry.width
         submenu.anchor.rect.height = entry.height
+        submenu.parentText = entry.modelData.text
         submenu.items = entry.modelData.children
         submenu.visible = true
+    }
+
+    // Items can be replaced while open (async results such as Open With apps);
+    // keep an open submenu showing its parent's new children.
+    onItemsChanged: {
+        if (!submenu.visible) return
+        for (var i = 0; i < items.length; i++) {
+            if (items[i].children && items[i].text === submenu.parentText) {
+                submenu.items = items[i].children
+                return
+            }
+        }
+        submenu.visible = false
     }
 
     onVisibleChanged: {
@@ -105,6 +119,7 @@ PopupWindow {
     PopupWindow {
         id: submenu
         property var items: []
+        property string parentText: ""
 
         anchor.window: menu
         anchor.edges: Edges.Top | Edges.Right

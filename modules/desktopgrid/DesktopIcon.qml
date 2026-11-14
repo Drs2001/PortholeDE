@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import Quickshell
 import Quickshell.Widgets
 import qs.singletons
@@ -17,7 +18,33 @@ Rectangle {
     property string screenName
 
     // Right-click; x/y are in grid-window coordinates.
-    signal contextMenuRequested(real x, real y)
+    signal contextMenuRequested(real x, real y, string inode)
+
+    // Showing the inline rename field instead of the label.
+    readonly property bool renaming: DesktopStateManager.renamingInode === String(model.inode)
+        && model.screen === screenName
+
+    onRenamingChanged: {
+        if (renaming) {
+            renameField.text = DesktopStateManager.renameDraft
+            renameField.hadFocus = false
+            // Wait for the context menu (and its focus grab) to close first.
+            renameFocusTimer.restart()
+        }
+    }
+
+    Timer {
+        id: renameFocusTimer
+        interval: 80
+        onTriggered: {
+            if (!rect.renaming) return
+            renameField.forceActiveFocus()
+            // Like file managers: preselect the name without its extension.
+            var n = renameField.text
+            var dot = n.lastIndexOf(".")
+            renameField.select(0, (!model.isDir && dot > 0) ? dot : n.length)
+        }
+    }
 
     // Selection is tracked centrally (so Ctrl+click can build a multi-selection
     // across the whole grid); this reruns whenever that set is reassigned.
@@ -37,6 +64,8 @@ Rectangle {
 
     width: 70
     height: content.implicitHeight + 10
+    // The rename box can grow down over the icon below; keep it on top.
+    z: renaming ? 10 : 0
     // Drop target (green): a drag is hovering this folder. Otherwise selected
     // (solid highlight + outline) / hover (faint highlight).
     color: dropTarget ? Qt.rgba(0.3, 0.8, 0.45, 0.4)
@@ -75,6 +104,78 @@ Rectangle {
             wrapMode: rect.selected ? Text.Wrap : Text.NoWrap
             font.pixelSize: 12
             text: rect.displayName
+            visible: !rect.renaming
+        }
+
+        // Inline rename, Windows style: an edit box exactly where the label
+        // was, the same width as the icon, wrapping onto more lines (and
+        // growing downward) for long names. Enter saves instead of adding a
+        // line break. The full filename (with extension) is edited.
+        TextArea {
+            id: renameField
+            visible: rect.renaming
+            width: parent.width
+            font.family: Themes.textFont
+            font.pixelSize: 12
+            horizontalAlignment: TextEdit.AlignHCenter
+            wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
+            color: Themes.textColor
+            selectionColor: Themes.accentColor
+            selectedTextColor: Themes.accentTextColor
+            selectByMouse: true
+            padding: 2
+
+            readonly property string error: rect.renaming ? DesktopStateManager.renameError(text) : ""
+
+            // Like clicking away in a file manager: losing focus (clicking
+            // another app or monitor) saves the rename. No HyprlandFocusGrab
+            // here - while one is active Hyprland ignores this window's cursor
+            // changes, so the I-beam never showed.
+            property bool hadFocus: false
+            onActiveFocusChanged: {
+                if (activeFocus) hadFocus = true
+                else if (hadFocus && rect.renaming) DesktopStateManager.commitRename()
+            }
+
+            // No fill or outline: the icon's selection highlight shows through,
+            // so the box blends in. A red outline appears only for invalid names.
+            background: Rectangle {
+                color: "transparent"
+                border.width: renameField.error ? 1 : 0
+                border.color: renameField.error ? "#e5534b" : Themes.mutedTextColor
+            }
+
+            onTextChanged: {
+                if (!rect.renaming) return
+                // Filenames are one line: drop line breaks (e.g. from a paste).
+                if (/[\r\n]/.test(text)) {
+                    var pos = cursorPosition
+                    text = text.replace(/[\r\n]+/g, "")
+                    cursorPosition = Math.min(pos, text.length)
+                }
+                DesktopStateManager.renameDraft = text
+            }
+            Keys.onReturnPressed: event => {
+                event.accepted = true
+                if (!error) DesktopStateManager.commitRename()
+            }
+            Keys.onEnterPressed: event => {
+                event.accepted = true
+                if (!error) DesktopStateManager.commitRename()
+            }
+            Keys.onEscapePressed: DesktopStateManager.cancelRename()
+
+            // Text-selection (I-beam) pointer while hovering the box. Takes no
+            // buttons, so clicks/drags still go to the text for selection.
+            MouseArea {
+                anchors.fill: parent
+                acceptedButtons: Qt.NoButton
+                hoverEnabled: true
+                cursorShape: Qt.IBeamCursor
+            }
+
+            ToolTip.visible: rect.renaming && error !== ""
+            ToolTip.text: error
         }
     }
 
@@ -86,6 +187,15 @@ Rectangle {
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
+        // Out of the way while renaming, so clicks reach the rename field and
+        // its I-beam cursor applies. (Only disabling it isn't enough: Qt still
+        // uses a disabled item's cursorShape, and this sits above the field.)
+        enabled: !rect.renaming
+        visible: !rect.renaming
+        cursorShape: Qt.PointingHandCursor
+
+        // Clicking another icon finishes a rename in progress.
+        onPressed: if (DesktopStateManager.renamingInode) DesktopStateManager.commitRename()
 
         onClicked: mouse => {
             if (mouse.button === Qt.RightButton) {
@@ -96,7 +206,7 @@ Rectangle {
                     DesktopStateManager.selectOnly(model.inode)
                 }
                 var p = rect.mapToItem(null, mouse.x, mouse.y)
-                rect.contextMenuRequested(p.x, p.y)
+                rect.contextMenuRequested(p.x, p.y, String(model.inode))
                 return
             }
             if (mouse.modifiers & Qt.ControlModifier) {
@@ -127,6 +237,7 @@ Rectangle {
     DragHandler {
         id: dragger
         target: null
+        enabled: !rect.renaming
 
         onActiveChanged: {
             if (active) {
