@@ -16,8 +16,14 @@ PopupWindow {
     Rectangle {
         id: trayBackground
         anchors.fill: parent
+        // Solid for now — the compositor doesn't blur this xdg-popup, so glass
+        // just looked see-through. TODO(glass): swap to Themes.popupGlassColor
+        // once a Hyprland/HyprGlass window rule blurs the popup.
         color: Themes.popupBackgroundColor
-        radius: 10
+        radius: 12
+        border.width: 1
+        border.color: Themes.dividerColor
+        clip: true
 
         StackView {
             id: rootStack

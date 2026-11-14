@@ -79,6 +79,7 @@ ListView {
       Layout.fillWidth: true
 
         Text {
+            font.family: Themes.textFont
           id: text
 
           anchors.fill: parent

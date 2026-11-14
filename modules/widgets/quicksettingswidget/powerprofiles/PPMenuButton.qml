@@ -44,6 +44,7 @@ ColumnLayout{
     }
 
     Text {
+        font.family: Themes.textFont
         Layout.fillWidth: true
         horizontalAlignment: Text.AlignHCenter
         text: PowerProfile.toString(PowerProfiles.profile)

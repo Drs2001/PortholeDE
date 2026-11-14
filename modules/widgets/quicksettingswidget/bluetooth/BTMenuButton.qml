@@ -34,7 +34,7 @@ ColumnLayout{
                             return bluetoothToggle.hovered ? Themes.accentHover : Themes.accentColor
                         }
                         else {
-                            return bluetoothToggle.hovered ? Themes.primaryHoverColor : Themes.utilButtonDisabled
+                            return bluetoothToggle.hovered ? Themes.tileInactiveHoverColor : Themes.tileInactiveColor
                         }
                     }
                     else{
@@ -70,7 +70,7 @@ ColumnLayout{
                             return bluetoothOpen.hovered ? Themes.accentHover : Themes.accentColor
                         }
                         else {
-                            return bluetoothOpen.hovered ? Themes.primaryHoverColor : Themes.utilButtonDisabled
+                            return bluetoothOpen.hovered ? Themes.tileInactiveHoverColor : Themes.tileInactiveColor
                         }
                     }
                     else{
@@ -86,6 +86,7 @@ ColumnLayout{
     }
 
     Text {
+        font.family: Themes.textFont
         Layout.alignment: Qt.AlignHCenter
         text: "Bluetooth"
         color: Themes.textColor

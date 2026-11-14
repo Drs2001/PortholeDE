@@ -19,10 +19,45 @@ Singleton {
     property var pairedDevices: adapter?.devices?.values.filter(d => d.paired && !d.connected)
     property var avaliableDevices: adapter?.devices?.values.filter(d => !d.paired && !d.connected && d.deviceName)
 
-    // Starts discovery for the adapter
+    // Discovery auto-stops after this long so the radio doesn't scan forever.
+    readonly property int discoveryTimeout: 20000
+
+    // Starts discovery and (re)arms the auto-stop countdown. Pressing refresh
+    // again while scanning just extends the window.
     function startDiscovery(){
-        if(!adapter.discovering){
+        console.log("[BT] startDiscovery, adapter=", adapter, "discovering=", adapter?.discovering)
+        if(adapter && !adapter.discovering){
             adapter.discovering = true
+        }
+        discoveryTimer.restart()
+        console.log("[BT] timer armed, running=", discoveryTimer.running, "interval=", discoveryTimer.interval)
+    }
+
+    // Stops discovery if it's running.
+    function stopDiscovery(){
+        console.log("[BT] stopDiscovery called, discovering(before)=", adapter?.discovering)
+        if(adapter && adapter.discovering){
+            adapter.discovering = false
+        }
+        discoveryTimer.stop()
+        console.log("[BT] stopDiscovery done, discovering(after)=", adapter?.discovering)
+    }
+
+    Timer {
+        id: discoveryTimer
+        interval: root.discoveryTimeout
+        repeat: false
+        onTriggered: {
+            console.log("[BT] discoveryTimer FIRED")
+            root.stopDiscovery()
+        }
+    }
+
+    // Watch the adapter's discovering state to see if BlueZ flips it back.
+    Connections {
+        target: root.adapter
+        function onDiscoveringChanged() {
+            console.log("[BT] discoveringChanged ->", root.adapter?.discovering)
         }
     }
 

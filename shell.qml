@@ -1,7 +1,9 @@
 import Quickshell
 import Quickshell.Hyprland
+import "modules/wallpaper"
 import "modules/bar"
 import "modules/applauncher"
+import "modules/desktopgrid"
 
 ShellRoot{
   GlobalShortcut {
@@ -11,7 +13,13 @@ ShellRoot{
           appMenu.visible = !appMenu.visible
       }
   }
-  Bar {}
+  Wallpaper {}
+  DesktopGrid{
+    barHeight: taskbar.barHeight
+  }
+  Bar {
+    id: taskbar
+  }
   AppLauncher{
     id: appMenu
   }

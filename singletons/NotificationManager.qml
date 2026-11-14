@@ -20,6 +20,7 @@ Singleton {
             summary: notification.summary,
             body: notification.body,
             icon: notification.appIcon,
+            desktopEntry: notification.desktopEntry, // used to find the app icon when appIcon is empty
             image: notification.image,
             timestamp: Date.now()
         }

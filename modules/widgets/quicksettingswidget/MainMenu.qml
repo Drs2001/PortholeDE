@@ -54,7 +54,7 @@ Item {
                     background: Rectangle {
                         implicitHeight: 32
                         implicitWidth: 32
-                        color: audioToggle.hovered ? Themes.primaryHoverColor : "transparent"
+                        color: audioToggle.hovered ? Themes.hoverOverlay : "transparent"
                         radius: 5
                     }
                     contentItem: Text {
@@ -120,6 +120,7 @@ Item {
                             }
 
                             contentItem: Text {
+                                font.family: Themes.textFont
                                 horizontalAlignment: Text.AlignHCenter
                                 text: Math.round(AudioManager.volumeLevel * 100)
                                 color: Themes.textColor
@@ -212,9 +213,14 @@ Item {
             id: bottomBar
             Layout.fillWidth: true
             Layout.preferredHeight: rootMenu.height * 0.15
-            color: Themes.primaryColor
-            bottomLeftRadius: 10
-            bottomRightRadius: 10
+            // Clean W11 footer: no chunky colored bar, just a divider above it.
+            color: "transparent"
+
+            Rectangle {
+                anchors { top: parent.top; left: parent.left; right: parent.right }
+                height: 1
+                color: Themes.dividerColor
+            }
 
             RowLayout{
                 anchors.fill: parent
@@ -229,6 +235,7 @@ Item {
                     font.pixelSize: 24
                 }
                 Text {
+                    font.family: Themes.textFont
                     visible: PowerManager.isLaptop
                     Layout.alignment: Qt.AlignVCenter
                     color: Themes.textColor
@@ -247,7 +254,7 @@ Item {
                     background: Rectangle {
                         implicitHeight: 32
                         implicitWidth: 32
-                        color: openSettings.hovered ? Themes.primaryHoverColor : "transparent"
+                        color: openSettings.hovered ? Themes.hoverOverlay : "transparent"
                         radius: 5
                     }
                     contentItem: Text {

@@ -14,161 +14,166 @@ LazyLoader {
         property var month: new Date().getMonth()
         property var year: new Date().getFullYear()
         property var monthNames: [
-            "January", "Febuary", "March", "April", "May", "June",
+            "January", "February", "March", "April", "May", "June",
             "July", "August", "September", "October", "November", "December"
         ]
 
         anchor.item: clockButton
         anchor.rect.y: -height - 20
-        implicitWidth: 300
-        implicitHeight: 400
+        implicitWidth: 320
+        implicitHeight: 372
         color: "transparent"
 
+        // Self-contained clock for the header (don't rely on the ClockWidget's id).
+        SystemClock {
+            id: calClock
+            enabled: popup.visible
+            precision: SystemClock.Minutes
+        }
+
         Rectangle {
-            id: trayBackground
             anchors.fill: parent
             color: Themes.popupBackgroundColor
             radius: 10
+            border.width: 1
+            border.color: Themes.dividerColor
 
             ColumnLayout {
                 anchors.fill: parent
-                Rectangle {
-                    id: topBar
+                anchors.margins: 16
+                spacing: 10
+
+                // ── Current date header ──────────────────────────────────────
+                Text {
+                    text: Qt.formatDateTime(calClock.date, "dddd, MMMM d")
+                    color: Themes.textColor
+                    font.family: Themes.textFont
+                    font.pixelSize: 16
+                    font.bold: true
                     Layout.fillWidth: true
-                    Layout.preferredHeight: popup.height * 0.10
-                    color: Themes.primaryColor
-                    topLeftRadius: 10
-                    topRightRadius: 10
+                }
+
+                // ── Month/year + navigation ──────────────────────────────────
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 4
 
                     Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        anchors.left: parent.left
-                        anchors.leftMargin: 10
-                        text: Qt.formatDateTime(clock.date, "dddd, MMMM d")
+                        text: popup.monthNames[popup.month] + " " + popup.year
+                        color: Themes.textColor
+                        font.family: Themes.textFont
                         font.pixelSize: 14
-                        color: Themes.textColor
-                    }
-                }
-                RowLayout{
-                    Layout.fillWidth: true
-                    Layout.margins: 10
-
-                    Text{
-                        text: monthNames[month] + " " + year
-                        color: Themes.textColor
-                    }
-                    // Spacer
-                    Item {
+                        font.bold: true
                         Layout.fillWidth: true
                     }
-                    Button{
+
+                    Button {
                         id: upButton
-                        implicitHeight: 24
-                        implicitWidth: 24
+                        implicitHeight: 28
+                        implicitWidth: 28
                         background: Rectangle {
-                            color: upButton.hovered ? Themes.primaryHoverColor : "transparent"
-                            radius: 5
+                            color: upButton.hovered ? Themes.hoverOverlay : "transparent"
+                            radius: 14
                         }
                         contentItem: Text {
-                            text: "\uf0d8"
+                            text: ""   // caret up (previous month)
                             color: Themes.textColor
+                            font.pixelSize: 14
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
-
                         onClicked: {
-                            if((month - 1) < 0){
-                                month = 11
-                                year = year - 1
-                            }
-                            else {
-                                month = month - 1
+                            if((popup.month - 1) < 0){
+                                popup.month = 11
+                                popup.year = popup.year - 1
+                            } else {
+                                popup.month = popup.month - 1
                             }
                         }
                     }
-                    Button{
+                    Button {
                         id: downButton
-                        implicitHeight: 24
-                        implicitWidth: 24
+                        implicitHeight: 28
+                        implicitWidth: 28
                         background: Rectangle {
-                            color: downButton.hovered ? Themes.primaryHoverColor : "transparent"
-                            radius: 5
+                            color: downButton.hovered ? Themes.hoverOverlay : "transparent"
+                            radius: 14
                         }
                         contentItem: Text {
-                            text: "\uf0d7"
+                            text: ""   // caret down (next month)
                             color: Themes.textColor
+                            font.pixelSize: 14
                             horizontalAlignment: Text.AlignHCenter
                             verticalAlignment: Text.AlignVCenter
                         }
-
                         onClicked: {
-                            if((month + 1) > 11){
-                                month = 0
-                                year = year + 1
-                            }
-                            else {
-                                month = month + 1
+                            if((popup.month + 1) > 11){
+                                popup.month = 0
+                                popup.year = popup.year + 1
+                            } else {
+                                popup.month = popup.month + 1
                             }
                         }
                     }
                 }
-                GridLayout {
-                    id: calendar
+
+                // ── Weekday header ───────────────────────────────────────────
+                DayOfWeekRow {
+                    id: weekRow
+                    locale: Qt.locale("en_US")
                     Layout.fillWidth: true
-                    columns: 1
+                    spacing: 0
 
-                    DayOfWeekRow {
-                        locale: Qt.locale("en_US")
-                        Layout.fillWidth: true
-
-                        delegate: Text {
-                            required property var model
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
-                            text: model.shortName
-                            font.pixelSize: 14
-                            color: Themes.textColor
-                        }
+                    delegate: Text {
+                        required property var model
+                        horizontalAlignment: Text.AlignHCenter
+                        verticalAlignment: Text.AlignVCenter
+                        text: model.narrowName
+                        font.family: Themes.textFont
+                        font.pixelSize: 12
+                        color: Themes.mutedTextColor
                     }
+                }
 
-                    MonthGrid {
-                        id: grid
-                        month: popup.month
-                        year: popup.year
-                        locale: Qt.locale("en_US")
+                // ── Day grid ─────────────────────────────────────────────────
+                MonthGrid {
+                    id: grid
+                    month: popup.month
+                    year: popup.year
+                    locale: Qt.locale("en_US")
+                    spacing: 2
 
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
+                    Layout.fillWidth: true
+                    Layout.fillHeight: true
 
-                        delegate: Rectangle {
-                            required property var model
-                            color: model.today ? Themes.accentColor : "transparent"
-                            radius: 20
+                    delegate: Item {
+                        required property var model
+
+                        Rectangle {
+                            anchors.centerIn: parent
+                            width: Math.min(parent.width, parent.height) - 4
+                            height: width
+                            radius: width / 2
+                            color: model.today ? Themes.accentColor
+                                : dayHover.hovered ? Themes.hoverOverlay
+                                : "transparent"
 
                             Text {
                                 anchors.centerIn: parent
                                 text: model.day
-                                font.pixelSize: 12
+                                font.family: Themes.textFont
+                                font.pixelSize: 13
                                 font.bold: model.today
-                                color: {
-                                    if (model.today) return Themes.accentTextColor 
-                                    if (model.month !== grid.month) return Themes.primaryHoverColor
-                                    return Themes.textColor
-                                }
+                                color: model.today ? Themes.accentTextColor
+                                    : model.month !== grid.month ? Themes.mutedTextColor
+                                    : Themes.textColor
                             }
+
+                            HoverHandler { id: dayHover }
                         }
                     }
                 }
-                Rectangle {
-                    id: bottomBar
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: popup.height * 0.10
-                    color: Themes.primaryColor
-                    bottomLeftRadius: 10
-                    bottomRightRadius: 10
-                }
             }
-            
         }
 
         onVisibleChanged: {

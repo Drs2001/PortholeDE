@@ -54,6 +54,7 @@ Item{
             radius: 10
 
             Text {
+                font.family: Themes.textFont
                 id: message
                 anchors.centerIn: parent 
                 anchors.margins: 30

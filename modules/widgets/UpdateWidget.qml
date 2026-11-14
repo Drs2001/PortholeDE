@@ -13,7 +13,7 @@ Button{
 
   background: Rectangle{
     anchors.fill: parent
-    color: updateButton.hovered ? Themes.primaryHoverColor : "transparent"
+    color: updateButton.hovered ? Themes.barHoverColor : "transparent"
     radius: 6
   }
   contentItem: Text{
@@ -50,6 +50,7 @@ Button{
         radius: 10
 
         Text {
+            font.family: Themes.textFont
             id: message
             anchors.centerIn: parent 
             anchors.margins: 30

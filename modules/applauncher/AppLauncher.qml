@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Effects
 import QtQuick.Layouts
 import Quickshell
+import Quickshell.Widgets
 import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.singletons
@@ -113,13 +114,12 @@ PanelWindow {
                         contentItem: Row{
                             spacing: 8
 
-                            Image {
-                                source: Quickshell.iconPath(modelData.icon, true)
-                                height: 24
-                                width: 24
-                                fillMode: Image.PreserveAspectFit
+                            IconImage {
+                                source: IconResolver.entryIcon(modelData)
+                                implicitSize: 24
                             }
                             Text{
+                                font.family: Themes.textFont
                                 text: modelData.name
                                 color: Themes.textColor
                             }
